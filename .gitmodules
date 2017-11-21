@@ -1,0 +1,7 @@
+[submodule "deps/uspi"]
+	path = deps/uspi
+	url = https://github.com/rsta2/uspi.git
+[submodule "deps/cpython"]
+	path = deps/cpython
+	url = https://github.com/python/cpython
+	branch = 3.6

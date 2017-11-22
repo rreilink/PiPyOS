@@ -1,15 +1,20 @@
 //
 // main.c
 //
-#include <uspienv.h>
-#include <uspi.h>
-#include <uspios.h>
-#include <uspienv/util.h>
-#include <uspienv/macros.h>
-#include <uspienv/types.h>
+
+#include <stddef.h>
+#include <stdlib.h>
+#include "Python.h"
 
 
-static const char FromSample[] = "sample";
+
+static wchar_t *argv[2] = { L"python", L"--help" };
+
+void initmsg(void);
+int USPiEnvInitialize (void);
+void USPiEnvClose (void);
+
+#define EXIT_HALT	0
 
 int main (void)
 {
@@ -18,7 +23,17 @@ int main (void)
         return EXIT_HALT;
     }
     
-    LogWrite (FromSample, LOG_ERROR, "Hello, world");
+    initmsg();
+    
+    setenv("PYTHONHASHSEED", "0", 1); // No random numbers available
+    
+    char *t;
+    t = getenv("PYTHONHASHSEED");
+    write(0, "HASHSEED=", 9);
+
+    write(0, t, strlen(t));
+    
+    Py_Main(2, argv);
 /*    
     if (!USPiInitialize ())
     {
@@ -39,11 +54,4 @@ int main (void)
     return EXIT_HALT;
 }
 
-void sig_ign(int code) {
-    LogWrite (FromSample, LOG_ERROR, "SIGIGN");
-}
 
-void sig_err(int code) {
-    LogWrite (FromSample, LOG_ERROR, "SIGERR");
-
-}

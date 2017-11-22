@@ -52,9 +52,9 @@ env_link = env_base.Clone(LIBS=['m'])
 env = env_uspi.Object(
     [
      'deps/uspi/env/lib/startup.S',
-     skip(Glob('deps/uspi/env/lib/*.S'), 'startup.S'),
+     skip(Glob('deps/uspi/env/lib/*.S'), ['startup.S', 'delayloop.S']),
      skip(Glob('deps/uspi/env/lib/*.c'), []),
-     'adaptors/os.c'
+     'adaptors/os.c', 'adaptors/delayloop.S',
 
     ])
 
@@ -90,19 +90,17 @@ python = env_py.Object(
      'config.c',
      ]
     ,
-    'adaptors/adaptor.c',
+    'adaptors/adaptor.c', 'main_python.c'
     ]
     )
 
-main_python = env_uspi.Object(['main_python.c'])
+
 
 env_link.Program('python.elf', (
     env,
     python,
-    main_python,
-    #Glob('libm/*.o')
     'libm.a'
     ))
 
 Command('python.img', 'python.elf', 'arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
-Command('test.img', 'python.elf', 'arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
+Command('test.img', 'test.elf', 'arm-none-eabi-objcopy -O binary $SOURCE $TARGET')

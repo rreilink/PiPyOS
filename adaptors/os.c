@@ -11,40 +11,14 @@
 
 static const char FromSample[] = "sample";
 
-int main (void)
-{
-    if (!USPiEnvInitialize ())
-    {
-        return EXIT_HALT;
-    }
-    
-    LogWrite (FromSample, LOG_ERROR, "Hello, world");
-    
-    if (!USPiInitialize ())
-    {
-        LogWrite (FromSample, LOG_ERROR, "Cannot initialize USPi");
-
-        USPiEnvClose ();
-
-        return EXIT_HALT;
-    }
 
 
-
-    
-    
-    
-    USPiEnvClose ();
-
-    return EXIT_HALT;
-}
-/*
 
 void _exit(int status) { LogWrite (FromSample, LOG_ERROR, "EXIT"); for(;;); }
 int _kill(int pid, int sig) { LogWrite (FromSample, LOG_ERROR, "KILL"); for(;;); }
 void * _sbrk(int increment) { LogWrite (FromSample, LOG_ERROR, "SBRK"); return (void*)-1; }
 int _getpid(void) { return 123; }
-int _fstat(int fd, struct stat *buf) { LogWrite (FromSample, LOG_ERROR, "FSTAT"); return -1; }
+int _fstat(int fd, void *buf) { LogWrite (FromSample, LOG_ERROR, "FSTAT"); return -1; }
 int _open(const char *pathname, int flags ) { LogWrite (FromSample, LOG_ERROR, "OPEN"); return -1; }
 int _close(int fd) { return 0; }
 int _isatty(int fd) { return fd<=2; }
@@ -59,13 +33,4 @@ int dup(int fd) {
     
 }
 
-*/
 
-void sig_ign(int code) {
-    LogWrite (FromSample, LOG_ERROR, "SIGIGN");
-}
-
-void sig_err(int code) {
-    LogWrite (FromSample, LOG_ERROR, "SIGERR");
-
-}

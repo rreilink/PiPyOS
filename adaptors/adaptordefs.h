@@ -8,7 +8,7 @@ struct timezone {
     int tz_dsttime;         /* type of DST correction */
 };
 
-typedef unsigned int mode_t;
+//typedef unsigned int mode_t;
 typedef long int time_t;
 
 

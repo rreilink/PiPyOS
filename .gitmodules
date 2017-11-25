@@ -5,3 +5,6 @@
 	path = deps/cpython
 	url = https://github.com/python/cpython
 	branch = 3.6
+[submodule "deps/ChibiOS-RPi"]
+	path = deps/ChibiOS-RPi
+	url = https://github.com/steve-bate/ChibiOS-RPi

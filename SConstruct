@@ -1,75 +1,81 @@
 
-
-
-env_base = Environment(
-    CC='arm-none-eabi-gcc', 
-    CCFLAGS=
-    '-mfloat-abi=soft -Wall -Wno-psabi '
-    '-march=armv7-a -mtune=cortex-a7 '
-    '-O'.split()
-
-    ,
-    
-
-    LINKFLAGS='-T deps/uspi/env/uspienv.ld -nostartfiles',
-    LINKCOM='arm-none-eabi-gcc -o $TARGET $LINKFLAGS $_LIBDIRFLAGS $_LIBFLAGS $SOURCES',
-    )
-
-
-env_uspi=env_base.Clone(
-    CPPPATH=['deps/uspi/include', 'deps/uspi/env/include'],
-    )
-env_uspi.Append(CCFLAGS = '-DRASPPI=2 -std=gnu99 -fsigned-char -fno-builtin -undef -nostdinc -nostdlib'.split())
-
-env_py=env_base.Clone(
-    CPPPATH=['.', 'adaptors', 'deps/cpython/Include'],
-    #LIBS=['m'],
-    )
-
-env_py.Append(CCFLAGS=['-std=c99', '-DPy_BUILD_CORE'])
-
 def skip(files, toskip):
     return [f for f in files if not f.name in toskip]
 
+env_base = Environment(
+    CC='/opt/local/bin/arm-none-eabi-gcc',  
+    CCFLAGS=
+    # '-mfloat-abi=soft -Wno-psabi '
+    # '-march=armv7-a -mtune=cortex-a7 '
+    '-mcpu=arm1176jz-s '
+    '-Wall -ffunction-sections -fdata-sections '
+    '-O'.split()
 
-env_link = env_base.Clone(LIBS=['m'])
+    ,
+    LIBS=['m'],
 
-# env_link.Append(CPPPATH=['deps/uspi/include', 'deps/uspi/env/include'])
-
-
-# testkeybd = env_link.Program('python', [
-#     'deps/uspi/env/lib/startup.S',
-#     Glob('deps/uspi/lib/*.c'), 
-#     skip(Glob('deps/uspi/env/lib/*.c'), ['string.c']),
-#     skip(Glob('deps/uspi/env/lib/*.S'), ['startup.S']),
-#     'deps/uspi/sample/keyboard/main.c',
-#     #'test.c'
-#     ]
-#     )
-
-
-
-env = env_uspi.Object(
-    [
-     'deps/uspi/env/lib/startup.S',
-     skip(Glob('deps/uspi/env/lib/*.S'), ['startup.S', 'delayloop.S']),
-     skip(Glob('deps/uspi/env/lib/*.c'), []),
-     'adaptors/os.c', 'adaptors/delayloop.S',
-
-    ])
-
-
-
-test = env_link.Program('test.elf', [
-    env,
-    'test.c',
-    ]
+    LINKFLAGS=
+        '-mcpu=arm1176jz-s '
+        '-T deps/ChibiOS-RPi/os/ports/GCC/ARM/BCM2835/ld/BCM2835.ld -nostartfiles '
+        '-Wl,--no-warn-mismatch,--gc-sections  -mno-thumb-interwork '
+    ,
+    LINKCOM='$CC -o $TARGET $LINKFLAGS $_LIBDIRFLAGS $_LIBFLAGS $SOURCES',
+    ASCOM='$CC $ASFLAGS $_CPPINCFLAGS -o $TARGET $SOURCES',
+    ASFLAGS="-c -x assembler-with-cpp $CCFLAGS",
+    
+    ASCOMSTR = "Assembling $TARGET",
+    CCCOMSTR = "Compiling $TARGET",
+    LINKCOMSTR = "Linking $TARGET",
+    
+    
     )
 
+######################
+#      ChibiOS       #
+######################
 
 
-Command('config.c', 'deps/cpython/Modules/config.c.in',
-    [Copy("$TARGET", "$SOURCE")])
+chibios_path = 'deps/ChibiOS-RPi/'
+
+env_chibios = env_base.Clone()
+env_chibios.Append(
+    CCFLAGS=
+    '-fomit-frame-pointer -Wall -Wextra -Wstrict-prototypes -mno-thumb-interwork -MD -MP'.split(),
+    
+    CPPPATH=['.'] + [chibios_path + x for x in [
+        '',
+        'os/ports/GCC/ARM', 'os/ports/GCC/ARM/BCM2835', 'os/kernel/include', 'test',
+        'os/hal/include', 'os/hal/platforms/BCM2835', 'os/various',
+        'boards/RASPBERRYPI_MODB'
+    ]]
+    )
+
+c = chibios_path
+
+chibios = env_chibios.Object(
+    [
+     Glob(chibios_path + 'os/ports/GCC/ARM/*.s'),
+     Glob(chibios_path + 'os/ports/GCC/ARM/*.c'),
+     Glob(chibios_path + 'os/ports/GCC/ARM/BCM2835/*.s'),
+     Glob(chibios_path + 'os/kernel/src/*.c'),
+     Glob(chibios_path + 'os/hal/src/*.c'),
+     Glob(chibios_path + 'test/*.c'),
+     Glob(chibios_path + 'os/hal/platforms/BCM2835/*.c'),
+     chibios_path + 'os/various/shell.c',
+     chibios_path + 'os/various/chprintf.c',
+     chibios_path + 'boards/RASPBERRYPI_MODB/board.c',
+     'adaptors/os.c',
+    ])
+    
+######################
+#      Python        #
+######################
+
+env_py=env_base.Clone(
+    CPPPATH=['.', 'adaptors', 'deps/cpython/Include'],
+    )
+
+env_py.Append(CCFLAGS=['-std=c99', '-DPy_BUILD_CORE'])
 
 
 python = env_py.Object(
@@ -90,17 +96,28 @@ python = env_py.Object(
      'config.c',
      ]
     ,
-    'adaptors/adaptor.c', 'main_python.c'
+    'adaptors/adaptor.c',
+    # 'main_python.c'
+    ]
+    )
+
+test = env_chibios.Program('test.elf', [
+    chibios,
+    'main_test.c',
+    'libm.a',
+    ]
+    )
+ 
+
+pipyos = env_chibios.Program('pipyos.elf', [
+    chibios,
+    python,
+    'main_pipyos.c',
+    'libm.a',
     ]
     )
 
 
 
-env_link.Program('python.elf', (
-    env,
-    python,
-    'libm.a'
-    ))
-
-Command('python.img', 'python.elf', 'arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
-Command('test.img', 'test.elf', 'arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
+Command('pipyos.img', 'pipyos.elf', '/opt/local/bin/arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
+Command('test.img', 'test.elf', '/opt/local/bin/arm-none-eabi-objcopy -O binary $SOURCE $TARGET')

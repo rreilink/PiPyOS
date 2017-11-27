@@ -21,6 +21,12 @@ redistribution of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 extern "C" {
 #endif
 
+extern PyObject* PyInit_posix(void);
+extern PyObject* PyInit__weakref(void);
+extern PyObject* PyInit__io(void);
+extern PyObject* PyInit_zipimport(void);
+extern PyObject* PyInit__codecs(void);
+extern PyObject* PyInit_errno(void);
 
 /* -- ADDMODULE MARKER 1 -- */
 
@@ -33,6 +39,12 @@ extern PyObject* PyInit__string(void);
 
 struct _inittab _PyImport_Inittab[] = {
 
+{"posix", PyInit_posix},
+{"_weakref", PyInit__weakref},
+{"_io", PyInit__io},
+{"zipimport", PyInit_zipimport},
+{"_codecs", PyInit__codecs},
+{"errno", PyInit_errno},
 /* -- ADDMODULE MARKER 2 -- */
 
     /* This module lives in marshal.c */

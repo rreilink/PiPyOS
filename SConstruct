@@ -17,15 +17,16 @@ env_base = Environment(
     LINKFLAGS=
         '-mcpu=arm1176jz-s '
         '-T deps/ChibiOS-RPi/os/ports/GCC/ARM/BCM2835/ld/BCM2835.ld -nostartfiles '
-        '-Wl,--no-warn-mismatch,--gc-sections  -mno-thumb-interwork '
+        '-Wl,--no-warn-mismatch  -mno-thumb-interwork '
+#        '-Wl,--no-warn-mismatch,--gc-sections,-Map=link.map  -mno-thumb-interwork '
     ,
     LINKCOM='$CC -o $TARGET $LINKFLAGS $_LIBDIRFLAGS $_LIBFLAGS $SOURCES',
     ASCOM='$CC $ASFLAGS $_CPPINCFLAGS -o $TARGET $SOURCES',
     ASFLAGS="-c -x assembler-with-cpp $CCFLAGS",
     
-    ASCOMSTR = "Assembling $TARGET",
-    CCCOMSTR = "Compiling $TARGET",
-    LINKCOMSTR = "Linking $TARGET",
+    # ASCOMSTR = "Assembling $TARGET",
+    # CCCOMSTR = "Compiling $TARGET",
+    # LINKCOMSTR = "Linking $TARGET",
     
     
     )
@@ -40,7 +41,7 @@ chibios_path = 'deps/ChibiOS-RPi/'
 env_chibios = env_base.Clone()
 env_chibios.Append(
     CCFLAGS=
-    '-fomit-frame-pointer -Wall -Wextra -Wstrict-prototypes -mno-thumb-interwork -MD -MP'.split(),
+    '-fomit-frame-pointer -Wall -Wextra -Wstrict-prototypes -mno-thumb-interwork -Wno-unused-parameter -MD -MP'.split(),
     
     CPPPATH=['.'] + [chibios_path + x for x in [
         '',
@@ -75,7 +76,7 @@ env_py=env_base.Clone(
     CPPPATH=['.', 'adaptors', 'deps/cpython/Include'],
     )
 
-env_py.Append(CCFLAGS=['-std=c99', '-DPy_BUILD_CORE'])
+env_py.Append(CCFLAGS=['-std=c99', '-DPy_BUILD_CORE', '-Wno-unused-function', '-Wno-unused-variable', '-Wno-unused-parameter'])
 
 
 python = env_py.Object(
@@ -92,32 +93,41 @@ python = env_py.Object(
     ['deps/cpython/Modules/gcmodule.c', 'deps/cpython/Modules/hashtable.c', 
      'deps/cpython/Modules/main.c', 'deps/cpython/Modules/getpath.c', 
      'deps/cpython/Modules/_tracemalloc.c', 'deps/cpython/Modules/faulthandler.c',
-     'deps/cpython/Modules/getbuildinfo.c',
+     'deps/cpython/Modules/getbuildinfo.c', 'deps/cpython/Modules/_weakref.c',
+     'deps/cpython/Modules/posixmodule.c', 'deps/cpython/Modules/zipimport.c',
+     'deps/cpython/Modules/_codecsmodule.c', 'deps/cpython/Modules/errnomodule.c',
      'config.c',
      ]
+    ,
+    Glob('deps/cpython/Modules/_io/*.c')
     ,
     'adaptors/adaptor.c',
     # 'main_python.c'
     ]
     )
 
-test = env_chibios.Program('test.elf', [
-    chibios,
-    'main_test.c',
-    'libm.a',
-    ]
-    )
- 
+# test = env_chibios.Program('test.elf', [
+#     chibios,
+#     'main_test.c',
+#     'libm.a',
+#     ]
+#     )
+
+
+#Command('initfs.o', 'initfs.bin', '/opt/local/bin/arm-none-eabi-objcopy -I binary $SOURCE -O elf32-littlearm --binary-architecture arm $TARGET')
+
+
+# TODO: add dependency of initfs.S/.o on initfs.bin
 
 pipyos = env_chibios.Program('pipyos.elf', [
     chibios,
     python,
     'main_pipyos.c',
     'libm.a',
+    'initfs.S',
     ]
     )
 
 
-
 Command('pipyos.img', 'pipyos.elf', '/opt/local/bin/arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
-Command('test.img', 'test.elf', '/opt/local/bin/arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
+# Command('test.img', 'test.elf', '/opt/local/bin/arm-none-eabi-objcopy -O binary $SOURCE $TARGET')

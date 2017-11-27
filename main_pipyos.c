@@ -27,6 +27,7 @@
 #include <sys/types.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #define EXTENDED_SHELL
 
@@ -128,7 +129,8 @@ static msg_t Thread1(void *p) {
   return 0;
 }
 
-static wchar_t *argv[2] = { L"python", L"--help" };
+static wchar_t *argv[3] = { L"python", L"-v", L"-S" };
+extern const char *Py_FileSystemDefaultEncoding;
 
 int Py_Main(int argc, wchar_t **argv);
 
@@ -138,15 +140,15 @@ static msg_t PythonThread(void *p) {
   chRegSetThreadName("python");
   
   setenv("PYTHONHASHSEED", "0", 1); // No random numbers available
-    
-  char *t;
-  t = getenv("PYTHONHASHSEED");
-  write(0, "HASHSEED=", 9);
-    
-  write(0, t, strlen(t));
+  setenv("PYTHONHOME", "/", 1);
+  setenv("HOME", "/", 1); // prevent import of pwdmodule in posixpath.expanduser
+
+  Py_FileSystemDefaultEncoding = "ascii";
+
   
+  printf("GOGOGO!\n");
   
-  Py_Main(1, argv);
+  Py_Main(3, argv);
   return 0;
 }
 
@@ -167,9 +169,9 @@ int main(void) {
   /*
    * Shell initialization.
    */
-  shellInit();
+ /* shellInit();
   shellCreate(&shell_config, SHELL_WA_SIZE, NORMALPRIO + 1);
-
+*/
   /*
    * Set mode of onboard LED
    */

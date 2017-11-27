@@ -6,6 +6,7 @@
 #ifndef Py_PYCONFIG_H
 #define Py_PYCONFIG_H
 
+
 #include "adaptor.h"
 
 //------ original file (with modifications) start here
@@ -125,13 +126,13 @@
 #undef HAVE_CLOCK
 
 /* Define to 1 if you have the `clock_getres' function. */
-#define HAVE_CLOCK_GETRES
+#define HAVE_CLOCK_GETRES 1
 
 /* Define to 1 if you have the `clock_gettime' function. */
-#define HAVE_CLOCK_GETTIME
+#define HAVE_CLOCK_GETTIME 1
 
 /* Define to 1 if you have the `clock_settime' function. */
-#define HAVE_CLOCK_SETTIME
+#undef HAVE_CLOCK_SETTIME
 
 /* Define if the C compiler supports computed gotos. */
 #undef HAVE_COMPUTED_GOTOS
@@ -248,7 +249,7 @@
 
 /* Define to 1 if you have the <dirent.h> header file, and it defines `DIR'.
    */
-#undef HAVE_DIRENT_H
+#define HAVE_DIRENT_H 1
 
 /* Define if you have the 'dirfd' function or macro. */
 #undef HAVE_DIRFD
@@ -284,7 +285,7 @@
 #undef HAVE_ERFC
 
 /* Define to 1 if you have the <errno.h> header file. */
-#undef HAVE_ERRNO_H
+#define HAVE_ERRNO_H
 
 /* Define to 1 if you have the `execv' function. */
 #undef HAVE_EXECV
@@ -311,7 +312,7 @@
 #undef HAVE_FCHOWNAT
 
 /* Define to 1 if you have the <fcntl.h> header file. */
-#undef HAVE_FCNTL_H
+#define HAVE_FCNTL_H 1
 
 /* Define if you have the 'fdatasync' function. */
 #undef HAVE_FDATASYNC
@@ -889,7 +890,7 @@
 #undef HAVE_SIGINTERRUPT
 
 /* Define to 1 if you have the <signal.h> header file. */
-#undef HAVE_SIGNAL_H
+#define HAVE_SIGNAL_H 1
 
 /* Define to 1 if you have the `sigpending' function. */
 #undef HAVE_SIGPENDING
@@ -1081,7 +1082,7 @@
 #undef HAVE_SYS_STATVFS_H
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
-#undef HAVE_SYS_STAT_H
+#define HAVE_SYS_STAT_H 1
 
 /* Define to 1 if you have the <sys/syscall.h> header file. */
 #undef HAVE_SYS_SYSCALL_H
@@ -1114,7 +1115,7 @@
 #undef HAVE_SYS_UTSNAME_H
 
 /* Define to 1 if you have the <sys/wait.h> header file. */
-#undef HAVE_SYS_WAIT_H
+#define HAVE_SYS_WAIT_H 1
 
 /* Define to 1 if you have the <sys/xattr.h> header file. */
 #undef HAVE_SYS_XATTR_H
@@ -1170,7 +1171,7 @@
 #undef HAVE_UNAME
 
 /* Define to 1 if you have the <unistd.h> header file. */
-#undef HAVE_UNISTD_H
+#define HAVE_UNISTD_H 1
 
 /* Define to 1 if you have the `unlinkat' function. */
 #undef HAVE_UNLINKAT
@@ -1193,7 +1194,7 @@
 #undef HAVE_UTIMES
 
 /* Define to 1 if you have the <utime.h> header file. */
-#undef HAVE_UTIME_H
+#define HAVE_UTIME_H
 
 /* Define to 1 if you have the `wait3' function. */
 #undef HAVE_WAIT3
@@ -1320,7 +1321,7 @@
 #define SIZEOF_LONG_LONG 8
 
 /* The size of `off_t', as computed by sizeof. */
-#undef SIZEOF_OFF_T
+#define SIZEOF_OFF_T 4
 
 /* The size of `pid_t', as computed by sizeof. */
 #undef SIZEOF_PID_T
@@ -1523,7 +1524,7 @@
 #undef mode_t
 
 /* Define to `long int' if <sys/types.h> does not define. */
-#undef off_t
+#define off_t long int
 
 /* Define to `int' if <sys/types.h> does not define. */
 #undef pid_t

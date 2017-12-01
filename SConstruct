@@ -102,6 +102,7 @@ python = env_py.Object(
     Glob('deps/cpython/Modules/_io/*.c')
     ,
     'adaptors/adaptor.c',
+    'adaptors/_rpimodule.c',
     # 'main_python.c'
     ]
     )

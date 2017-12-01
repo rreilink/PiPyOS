@@ -24,10 +24,6 @@ char *getcwd(char *buf, size_t size) {
 }
 
 
-static PyObject *readlinecallback = NULL;
-char *PyOS_StdioReadline(FILE *sys_stdin, FILE *sys_stdout, const char *prompt);
-
-
 /*
   Provide the readline functionality provided in the Python function
   _readline.readline
@@ -35,6 +31,10 @@ char *PyOS_StdioReadline(FILE *sys_stdin, FILE *sys_stdout, const char *prompt);
   This function ignores sys_stdin and sys_stdout, they are assumed to be
   the default values.
 */
+static PyObject *readlinecallback = NULL;
+char *PyOS_StdioReadline(FILE *sys_stdin, FILE *sys_stdout, const char *prompt);
+
+
 char *PiPyOS_readline(FILE *sys_stdin, FILE *sys_stdout, const char *prompt) {
     PyObject *module = NULL, *function = NULL, *line = NULL, *linebytes = NULL;
     char *line_cstr = NULL, *ret = NULL;

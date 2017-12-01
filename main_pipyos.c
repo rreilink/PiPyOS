@@ -129,7 +129,7 @@ static msg_t Thread1(void *p) {
   return 0;
 }
 
-static wchar_t *argv[3] = { L"python", L"-S", L"-B" };
+static wchar_t *argv[] = { L"python", L"-S", L"-B", L"-i", L"-c", L"import _rpi as r" };
 extern const char *Py_FileSystemDefaultEncoding;
 
 
@@ -154,7 +154,7 @@ static msg_t PythonThread(void *p) {
   
   PiPyOS_initreadline();
   
-  Py_Main(3, argv);
+  Py_Main(6, argv);
   return 0;
 }
 

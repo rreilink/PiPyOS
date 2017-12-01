@@ -38,7 +38,7 @@ class InitFS:
         # Add directory names
         
         
-        filetable = self.filetable.copy()
+        filetable = list(self.filetable) # Copy table
         newdirs = { os.path.dirname(f[0]) for f in filetable }
         dirs = newdirs
         
@@ -61,7 +61,7 @@ class InitFS:
         # For each directory, first the file, then subdir
         filetable.sort(key=lambda x: (os.path.dirname(x[0]), x[2]==0xffffffff, x[0]))
         
-        print(filetable)
+        # print(filetable)
         
         # Calculate number of bytes required for main table (add 1 for 0,0,0 sentinel)
         maintablesize = (len(filetable) + 1) * struct.calcsize(self.recordformat)
@@ -85,41 +85,46 @@ class InitFS:
         assert len(maintable) == maintablesize
         return maintable + nametable + self.data
         
+def main(target=None, source=None, env=None):
+    if target is None:
+        outfile = 'initfs.bin'
+    else:
+        outfile = target[0].name
         
-fs = InitFS()
+    fs = InitFS()
+    
+    
+    for file in [
+        'encodings/__init__.py',
+        'encodings/ascii.py',
+        'encodings/aliases.py',
+        'encodings/utf_8.py',
+        'encodings/latin_1.py',
+        'io.py',
+        'abc.py',
+        '_weakrefset.py',
+        'site.py',
+        '_sitebuiltins.py',
+        'os.py',
+        'stat.py',
+        'genericpath.py', 
+        '_collections_abc.py',
+        'struct.py',
+        'codecs.py']:
+            fs.addfile('deps/cpython/Lib/' + file, '/boot/' + file)
+    
+    # 
+    fs.addfile('lib/posixpath.py','/boot/posixpath.py') 
+    fs.addfile('lib/sysconfig.py','/boot/sysconfig.py') 
+    fs.addfile('python/_readline.py','/boot/_readline.py') 
+    fs.addfile('python/rpi.py','/boot/rpi.py') 
+    
+    with open(outfile, 'wb') as file:
+        file.write(fs.tostring())
 
-
-for file in [
-    'encodings/__init__.py',
-    'encodings/ascii.py',
-    'encodings/aliases.py',
-    'encodings/utf_8.py',
-    'encodings/latin_1.py',
-    'io.py',
-    'abc.py',
-    '_weakrefset.py',
-    'site.py',
-    '_sitebuiltins.py',
-    'os.py',
-    'stat.py',
-    'genericpath.py', 
-    '_collections_abc.py',
-
-    'codecs.py']:
-        fs.addfile('../deps/cpython/Lib/' + file, '/boot/' + file)
-
-# 
-fs.addfile('../lib/posixpath.py','/boot/posixpath.py') 
-fs.addfile('../lib/sysconfig.py','/boot/sysconfig.py') 
-fs.addfile('../python/_readline.py','/boot/_readline.py') 
-
-# fs.addfile('../deps/cpython/Lib/encodings/ascii.py', '/boot/encodings/ascii.py')
-# fs.addfile('../deps/cpython/Lib/encodings/ascii.py', '/boot/test.py')
-# fs.addfile('../deps/cpython/Lib/codecs.py', '/boot/codecs.py')
-
-with open('../initfs.bin', 'wb') as file:
-    file.write(fs.tostring())
-
-
+if __name__ == '__main__':
+    import os
+    os.chdir('..')
+    main()
         
     

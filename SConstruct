@@ -1,3 +1,6 @@
+import sys
+sys.path.append('tools')
+import mkinitfs
 
 def skip(files, toskip):
     return [f for f in files if not f.name in toskip]
@@ -96,6 +99,7 @@ python = env_py.Object(
      'deps/cpython/Modules/getbuildinfo.c', 'deps/cpython/Modules/_weakref.c',
      'deps/cpython/Modules/posixmodule.c', 'deps/cpython/Modules/zipimport.c',
      'deps/cpython/Modules/_codecsmodule.c', 'deps/cpython/Modules/errnomodule.c',
+     'deps/cpython/Modules/_struct.c',
      'config.c',
      ]
     ,
@@ -115,17 +119,20 @@ python = env_py.Object(
 #     )
 
 
-#Command('initfs.o', 'initfs.bin', '/opt/local/bin/arm-none-eabi-objcopy -I binary $SOURCE -O elf32-littlearm --binary-architecture arm $TARGET')
-
-
 # TODO: add dependency of initfs.S/.o on initfs.bin
+
+mkinitfs = Command('initfs.bin', '', mkinitfs.main)
+AlwaysBuild(mkinitfs)
+
+initfs = env_chibios.Object('initfs.S')
+env_chibios.Depends(initfs, 'initfs.bin') # The include dependency for assembly is not found by scons, add it manually
 
 pipyos = env_chibios.Program('pipyos.elf', [
     chibios,
     python,
     'main_pipyos.c',
     'libm.a',
-    'initfs.S',
+    initfs,
     ]
     )
 

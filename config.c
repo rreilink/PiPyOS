@@ -27,6 +27,7 @@ extern PyObject* PyInit__io(void);
 extern PyObject* PyInit_zipimport(void);
 extern PyObject* PyInit__codecs(void);
 extern PyObject* PyInit_errno(void);
+extern PyObject* PyInit__struct(void);
 extern PyObject* PyInit__rpi(void);
 
 
@@ -47,6 +48,7 @@ struct _inittab _PyImport_Inittab[] = {
 {"zipimport", PyInit_zipimport},
 {"_codecs", PyInit__codecs},
 {"errno", PyInit_errno},
+{"_struct", PyInit__struct},
 {"_rpi", PyInit__rpi},
 /* -- ADDMODULE MARKER 2 -- */
 

@@ -129,10 +129,14 @@ static msg_t Thread1(void *p) {
   return 0;
 }
 
-static wchar_t *argv[3] = { L"python", L"-v", L"-S" };
+static wchar_t *argv[3] = { L"python", L"-S", L"-B" };
 extern const char *Py_FileSystemDefaultEncoding;
 
+
+
+
 int Py_Main(int argc, wchar_t **argv);
+void PiPyOS_initreadline(void);
 
 static WORKING_AREA(waPythonThread, 1048576);
 static msg_t PythonThread(void *p) {
@@ -143,14 +147,19 @@ static msg_t PythonThread(void *p) {
   setenv("PYTHONHOME", "/", 1);
   setenv("HOME", "/", 1); // prevent import of pwdmodule in posixpath.expanduser
 
-  Py_FileSystemDefaultEncoding = "ascii";
+  Py_FileSystemDefaultEncoding = "latin-1";
 
   
   printf("GOGOGO!\n");
   
+  PiPyOS_initreadline();
+  
   Py_Main(3, argv);
   return 0;
 }
+
+
+
 
 /*
  * Application entry point.

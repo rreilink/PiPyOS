@@ -41,7 +41,7 @@ chibios_path = 'deps/ChibiOS-RPi/'
 env_chibios = env_base.Clone()
 env_chibios.Append(
     CCFLAGS=
-    '-fomit-frame-pointer -Wall -Wextra -Wstrict-prototypes -mno-thumb-interwork -Wno-unused-parameter -MD -MP'.split(),
+    '-fomit-frame-pointer -Wall -Wextra -Wstrict-prototypes -mno-thumb-interwork -Wno-unused-parameter'.split(),
     
     CPPPATH=['.'] + [chibios_path + x for x in [
         '',

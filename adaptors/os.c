@@ -70,9 +70,11 @@ int getppid(void) {
     return 0;
 }
 
+//TODO general: set errno upon error
+
 int _fstat(int fd, void *buf) {
     //called before printf can be used, so use chprintf
-    chprintf((BaseSequentialStream *)&SD1, "FSTAT\n"); 
+//    chprintf((BaseSequentialStream *)&SD1, "FSTAT\n"); 
     return -1;
 }
 
@@ -148,7 +150,7 @@ int lstat(const char *path, struct stat *buf) {
 }
 
 int fcntl(int fd, int cmd, ...) {
-    printf("FCNTL\n");
+//    printf("FCNTL\n");
     return 0; // TODO
 }
 
@@ -202,7 +204,7 @@ int _open(const char *pathname, int flags ) {
 
 
 int _close(int fd) { 
-    printf("CLOSE %d\n", fd);  
+//    printf("CLOSE %d\n", fd);  
     openfiles[fd].data=0;
     return 0; 
 }
@@ -215,7 +217,7 @@ int _isatty(int fd) {
 
 int _lseek(int fd, int offset, int whence) {
 
-    printf("SEEK\n"); 
+//    printf("SEEK\n"); 
     return -1; 
 }
 ssize_t _write(int fd, const void *buf, size_t count) {
@@ -270,7 +272,7 @@ gid_t getegid(void) { return 0; }
 char *ttyname(int fd) {  return NULL; }
 
 
-
+//TODO: able to list root directory
 
 DIR *opendir(const char *name) {
     file_rec_t *r = (file_rec_t *)&_binary_initfs_bin_start;
@@ -340,7 +342,7 @@ struct dirent *readdir(DIR *dirp) {
             }
         } 
     }
-    printf("READDIR end\n");
+//    printf("READDIR end\n");
     return NULL;
     
 }
@@ -354,7 +356,7 @@ int closedir(DIR *dirp) {
 
 
 int dup(int fd) { 
-    printf("DUP\n");
+//    printf("DUP\n");
     // TODO: implement real functionality if required
     // Core Python uses it only to check if fd is valid (stdin closed etc)
     return fd;

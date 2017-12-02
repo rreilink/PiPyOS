@@ -1,25 +1,11 @@
 
 #include "Python.h"
-
-// TODO: this somewhere else
-#define dmb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" : : "r" (0) : "memory")
+#include "bcmmailbox.h"
 
 /*
   Expose the RPi peripherals map to Python
 */
-static inline unsigned int _read(unsigned int address) {
-    unsigned int ret;
-    dmb();
-    ret = *((unsigned long *)address);
-    dmb();
-    return ret;
-}
 
-static inline void _write(unsigned int address, unsigned int value) {
-    dmb();
-    *((unsigned long *)address) = value;
-    dmb();
-}
 
 static PyObject *
 _rpi_peek(PyObject *self, PyObject *args)
@@ -35,9 +21,9 @@ _rpi_peek(PyObject *self, PyObject *args)
         return NULL;
     }
     
-    dmb();
+    DataMemBarrier();
     value = *((unsigned long *)address);
-    dmb();
+    DataMemBarrier();
     
     return PyLong_FromLong(value);
 }
@@ -56,44 +42,44 @@ _rpi_poke(PyObject *self, PyObject *args)
         return NULL;
     }
     
-    dmb();
+    DataMemBarrier();
     *((long *)address) = value;
-    dmb();
+    DataMemBarrier();
     
     Py_RETURN_NONE;
 }
 
-#define MAILBOX_BASE		(0x20000000 + 0xB880)
-
-#define MAILBOX0_READ  		   (MAILBOX_BASE + 0x00)
-#define MAILBOX0_STATUS 	       (MAILBOX_BASE + 0x18)
-#define MAILBOX_STATUS_EMPTY	   0x40000000
-#define MAILBOX1_WRITE         (MAILBOX_BASE + 0x20)
-#define MAILBOX1_STATUS 	       (MAILBOX_BASE + 0x38)
-#define MAILBOX_STATUS_FULL	   0x80000000
 
 
-//
-// Cache control
-//
-#define InvalidateInstructionCache()	\
-				__asm volatile ("mcr p15, 0, %0, c7, c5,  0" : : "r" (0) : "memory")
-#define FlushPrefetchBuffer()	__asm volatile ("mcr p15, 0, %0, c7, c5,  4" : : "r" (0) : "memory")
-#define FlushBranchTargetCache()	\
-				__asm volatile ("mcr p15, 0, %0, c7, c5,  6" : : "r" (0) : "memory")
-#define InvalidateDataCache()	__asm volatile ("mcr p15, 0, %0, c7, c6,  0" : : "r" (0) : "memory")
-#define CleanDataCache()	__asm volatile ("mcr p15, 0, %0, c7, c10, 0" : : "r" (0) : "memory")
-
-//
-// Barriers
-//
-#define DataSyncBarrier()	__asm volatile ("mcr p15, 0, %0, c7, c10, 4" : : "r" (0) : "memory")
-#define DataMemBarrier() 	__asm volatile ("mcr p15, 0, %0, c7, c10, 5" : : "r" (0) : "memory")
-
-#define InstructionSyncBarrier() FlushPrefetchBuffer()
-#define InstructionMemBarrier()	FlushPrefetchBuffer()
-
-
+static PyObject *
+_rpi_get_property(PyObject *self, PyObject *args)
+{
+    PyObject *reply = NULL;
+    int tagid, requestsize, responsesize;
+    char *buffer;
+    
+    if (!PyArg_ParseTuple(args, "ii", &tagid, &requestsize)) {
+        return NULL;
+    }
+    
+    buffer = malloc(requestsize);
+    if (!buffer) return PyErr_NoMemory();
+    
+    responsesize = PiPyOS_bcm_get_property_tag(tagid, buffer, requestsize);
+    
+    if (responsesize<0) {
+        free(buffer);
+        PyErr_SetString(PyExc_IOError, "failed to get property from VC");
+        return NULL;
+    }
+    
+    reply = PyBytes_FromStringAndSize(buffer, responsesize);
+    
+    // The following works in both cases: error or no error
+    Py_XINCREF(reply);
+    free(buffer);
+    return reply;    
+}
 
 static PyObject *
 _rpi_writereadmailbox(PyObject *self, PyObject *args)
@@ -120,43 +106,44 @@ _rpi_writereadmailbox(PyObject *self, PyObject *args)
     
     // get 16-byte aligned buffer
     buffer = malloc(size + 15);
-    if (!buffer) return NULL;
+    if (!buffer) return PyErr_NoMemory();
     
     buffer_aligned = (void*)((((unsigned int)buffer)+15) & ~0xf);
     memcpy(buffer_aligned, data, size);
     
-    
-    CleanDataCache ();
-    DataSyncBarrier ();
-    
-    while(_read(MAILBOX1_STATUS) & MAILBOX_STATUS_FULL);
-    _write(MAILBOX1_WRITE, channel | 0x40000000 | (unsigned int) buffer_aligned);
-    
-    unsigned long read;
-    do {
-        while (_read(MAILBOX0_STATUS) & MAILBOX_STATUS_EMPTY);
-        read = _read(MAILBOX0_READ);
-    } while ((read & 0xf) != channel);
-    
-    InvalidateDataCache ();
-    
+    PiPyOS_bcm_mailbox_write_read(channel, buffer_aligned);
+        
     reply = PyBytes_FromStringAndSize(buffer_aligned, size);
-    if (reply == NULL) {
-        free(buffer);
-        return NULL;
-    }
-    Py_INCREF(reply);
+    
+    // The following works in both cases: error or no error
+    Py_XINCREF(reply);
     free(buffer);
     return reply;
     
 
 }
 
+extern void PiPyOS_bcm_framebuffer_putstring(char*);
+
+static PyObject *
+_rpi_fbwrite(PyObject *self, PyObject *args) {
+    char *data;
+    if (!PyArg_ParseTuple(args, "y",  &data)) {
+        return NULL;
+    }    
+    PiPyOS_bcm_framebuffer_putstring(data);
+
+    Py_RETURN_NONE;
+}
+
+
 
 static PyMethodDef _RpiMethods[] = {
     {"peek",  _rpi_peek, METH_VARARGS, "Read a memory address."},
     {"poke",  _rpi_poke, METH_VARARGS, "Write a memory address."},
     {"writereadmailbox", _rpi_writereadmailbox, METH_VARARGS, "Write to mailbox and read reply."},
+    {"getproperty", _rpi_get_property, METH_VARARGS, "Get VideoCore property."},
+    {"fb_write", _rpi_fbwrite, METH_VARARGS, "Write bytes to the framebuffer"},
 
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };

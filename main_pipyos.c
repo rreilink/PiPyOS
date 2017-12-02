@@ -28,6 +28,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "adaptors/bcmmailbox.h"
 
 #define EXTENDED_SHELL
 
@@ -36,6 +37,8 @@
 #ifdef EXTENDED_SHELL
 
 #define TEST_WA_SIZE        THD_WA_SIZE(4096)
+
+char cmdline[1024];
 
 static void cmd_mem(BaseSequentialStream *chp, int argc, char *argv[]) {
   size_t n, size;
@@ -174,6 +177,17 @@ int main(void) {
    */
   sdStart(&SD1, &serialConfig); 
   chprintf((BaseSequentialStream *)&SD1, "Main (SD1 started)\r\n");
+
+  int cmdline_length = PiPyOS_bcm_get_property_tag(0x50001, cmdline, sizeof(cmdline)-1);
+  if (cmdline_length <0) {
+    *cmdline = '\0';
+  } else {
+    cmdline[cmdline_length] = '\0'; // Add trailing null
+  }
+
+  chprintf((BaseSequentialStream *)&SD1, "cmdline='%s'\r\n", cmdline);
+
+  PiPyOS_bcm_framebuffer_init(0, 0);
 
   /*
    * Shell initialization.

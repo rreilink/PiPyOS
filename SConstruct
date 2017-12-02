@@ -12,7 +12,7 @@ env_base = Environment(
     # '-march=armv7-a -mtune=cortex-a7 '
     '-mcpu=arm1176jz-s '
     '-Wall -ffunction-sections -fdata-sections '
-    '-O'.split()
+    '-O2'.split()
 
     ,
     LIBS=['m'],
@@ -106,6 +106,8 @@ python = env_py.Object(
     Glob('deps/cpython/Modules/_io/*.c')
     ,
     'adaptors/adaptor.c',
+    'adaptors/bcmmailbox.c',
+    'adaptors/bcmframebuffer.c',
     'adaptors/_rpimodule.c',
     # 'main_python.c'
     ]

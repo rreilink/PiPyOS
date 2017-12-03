@@ -10,7 +10,7 @@ env_base = Environment(
     CCFLAGS=
     # '-mfloat-abi=soft -Wno-psabi '
     # '-march=armv7-a -mtune=cortex-a7 '
-    '-mcpu=arm1176jz-s '
+    '-mcpu=arm1176jz-s -mno-thumb-interwork '
     '-Wall -ffunction-sections -fdata-sections '
     '-O2'.split()
 
@@ -20,16 +20,15 @@ env_base = Environment(
     LINKFLAGS=
         '-mcpu=arm1176jz-s '
         '-T deps/ChibiOS-RPi/os/ports/GCC/ARM/BCM2835/ld/BCM2835.ld -nostartfiles '
-        '-Wl,--no-warn-mismatch  -mno-thumb-interwork '
-#        '-Wl,--no-warn-mismatch,--gc-sections,-Map=link.map  -mno-thumb-interwork '
+        '-Wl,--no-warn-mismatch,--gc-sections -mno-thumb-interwork '
     ,
     LINKCOM='$CC -o $TARGET $LINKFLAGS $_LIBDIRFLAGS $_LIBFLAGS $SOURCES',
     ASCOM='$CC $ASFLAGS $_CPPINCFLAGS -o $TARGET $SOURCES',
     ASFLAGS="-c -x assembler-with-cpp $CCFLAGS",
     
-    # ASCOMSTR = "Assembling $TARGET",
-    # CCCOMSTR = "Compiling $TARGET",
-    # LINKCOMSTR = "Linking $TARGET",
+    ASCOMSTR = "Assembling $TARGET",
+    CCCOMSTR = "Compiling $TARGET",
+    LINKCOMSTR = "Linking $TARGET",
     
     
     )
@@ -44,7 +43,7 @@ chibios_path = 'deps/ChibiOS-RPi/'
 env_chibios = env_base.Clone()
 env_chibios.Append(
     CCFLAGS=
-    '-fomit-frame-pointer -Wall -Wextra -Wstrict-prototypes -mno-thumb-interwork -Wno-unused-parameter'.split(),
+    '-fomit-frame-pointer -Wall -Wextra -Wstrict-prototypes  -Wno-unused-parameter'.split(),
     
     CPPPATH=['.'] + [chibios_path + x for x in [
         '',
@@ -113,15 +112,6 @@ python = env_py.Object(
     ]
     )
 
-# test = env_chibios.Program('test.elf', [
-#     chibios,
-#     'main_test.c',
-#     'libm.a',
-#     ]
-#     )
-
-
-# TODO: add dependency of initfs.S/.o on initfs.bin
 
 mkinitfs = Command('initfs.bin', '', mkinitfs.main)
 AlwaysBuild(mkinitfs)
@@ -133,11 +123,11 @@ pipyos = env_chibios.Program('pipyos.elf', [
     chibios,
     python,
     'main_pipyos.c',
-    'libm.a',
+    '/opt/local/arm-none-eabi/lib/libm.a',
     initfs,
     ]
     )
 
 
 Command('pipyos.img', 'pipyos.elf', '/opt/local/bin/arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
-# Command('test.img', 'test.elf', '/opt/local/bin/arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
+

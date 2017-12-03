@@ -116,8 +116,7 @@ def main(target=None, source=None, env=None):
     # 
     fs.addfile('lib/posixpath.py','/boot/posixpath.py') 
     fs.addfile('lib/sysconfig.py','/boot/sysconfig.py') 
-    fs.addfile('python/_readline.py','/boot/_readline.py') 
-    fs.addfile('python/rpi.py','/boot/rpi.py') 
+    fs.addfile('python/_readline.py','/boot/_readline.py')  
     
     with open(outfile, 'wb') as file:
         file.write(fs.tostring())

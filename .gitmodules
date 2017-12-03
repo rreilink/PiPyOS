@@ -7,4 +7,4 @@
 	branch = 3.6
 [submodule "deps/ChibiOS-RPi"]
 	path = deps/ChibiOS-RPi
-	url = https://github.com/steve-bate/ChibiOS-RPi
+	url = https://github.com/rreilink/ChibiOS-RPi

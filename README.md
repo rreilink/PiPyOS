@@ -38,10 +38,10 @@ The following functionality is currently implemented:
 * Interface via the serial console
 * readline
 * Framebuffer (screen via HDMI) support
+* evaluation of real-time performance
 
 The following functionality is foreseen (in order of development)
 
-* evaluation of real-time performance
 * USB keyboard support
 * SD-card interface
 * FAT filesystem support

@@ -11,7 +11,7 @@ env_base = Environment(
     # '-mfloat-abi=soft -Wno-psabi '
     # '-march=armv7-a -mtune=cortex-a7 '
     '-mcpu=arm1176jz-s -mno-thumb-interwork '
-    '-Wall -ffunction-sections -fdata-sections '
+    '-Wall -ffunction-sections -fdata-sections -g '
     '-O2'.split()
 
     ,
@@ -123,6 +123,7 @@ pipyos = env_chibios.Program('pipyos.elf', [
     chibios,
     python,
     'main_pipyos.c',
+    'fiqhandler.S',
     '/opt/local/arm-none-eabi/lib/libm.a',
     initfs,
     ]

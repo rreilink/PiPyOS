@@ -220,7 +220,13 @@ int _lseek(int fd, int offset, int whence) {
 //    printf("SEEK\n"); 
     return -1; 
 }
+
+
+// TODO: this definition somewhere else
+extern void PiPyOS_bcm_framebuffer_putstring(char*, int);
+
 ssize_t _write(int fd, const void *buf, size_t count) {
+    PiPyOS_bcm_framebuffer_putstring(buf, count);
     chSequentialStreamWrite((BaseSequentialStream *)&SD1, buf, count);
     return count; 
 

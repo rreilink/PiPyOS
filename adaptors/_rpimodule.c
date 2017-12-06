@@ -123,15 +123,16 @@ _rpi_writereadmailbox(PyObject *self, PyObject *args)
 
 }
 
-extern void PiPyOS_bcm_framebuffer_putstring(char*);
+extern void PiPyOS_bcm_framebuffer_putstring(char*, int);
 
 static PyObject *
 _rpi_fbwrite(PyObject *self, PyObject *args) {
     char *data;
-    if (!PyArg_ParseTuple(args, "y",  &data)) {
+    int size;
+    if (!PyArg_ParseTuple(args, "y#",  &data, &size)) {
         return NULL;
     }    
-    PiPyOS_bcm_framebuffer_putstring(data);
+    PiPyOS_bcm_framebuffer_putstring(data, size);
 
     Py_RETURN_NONE;
 }

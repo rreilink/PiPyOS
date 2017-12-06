@@ -113,11 +113,17 @@ void PiPyOS_bcm_framebuffer_init(int width, int height) {
 }
 
 
+/* count = -1: write upto \n
+ * count >=0: write count chars
+ */
 
-void PiPyOS_bcm_framebuffer_putstring(char *s) {
+void PiPyOS_bcm_framebuffer_putstring(char *s, int count) {
     char c;
     uint8_t color;
     uint8_t *p, *p2;
+    
+    int escapestate = 0, escapeparam = 0;
+    
     
     /* Some optimization: we only write the cursor when we are done writing 
      * the string. When the first char is written, it overwrites the cursor.
@@ -127,8 +133,58 @@ void PiPyOS_bcm_framebuffer_putstring(char *s) {
      */
     int cursorvisible = 1;
     
-    while((c = *s++)) {
+    while(1) {
+        c = *s++;
+        
+        if (count==-1) {
+            if (!c) break;  // count == -1: write until \0
+        } else {
+            if (count == 0) break;
+            count--;
+        }
+
         p = _ptr_for_char(_posx, _posy);
+
+        // minimal terminal emulator to support the codes emitted by _readline.py
+        if (c=='\x1b') {
+            escapestate = 1;
+            continue;
+        }
+        
+        switch (escapestate) {
+        case 1:
+            if (c == '[') {
+                escapestate++;
+                escapeparam = 0;
+                continue;
+            }
+            break;
+        case 2:
+            if (c>='0' && c<='9') {
+                escapeparam = escapeparam * 10 + (c-'0');
+                continue;
+            }
+            if (c=='K') { // clear till end of line
+                // no need to erase cursor, we will clear the entire line
+                for (int i=0; i<CHARHEIGHT; i++) {
+                    memset(p, _bgcolor, fb_info.pitch - (_posx*CHARWIDTH));
+                    p+=fb_info.pitch;
+                }
+            } else if (c=='D') { // back x positions
+                if (cursorvisible) _erasecursor();
+                if (escapeparam == 0) escapeparam = 1;
+                if (_posx > escapeparam) _posx-=escapeparam; else _posx = 0; 
+            } else if (c=='C') { // forward x positions
+                if (cursorvisible) _erasecursor();
+                if (escapeparam == 0) escapeparam = 1;
+                _posx += escapeparam;
+                goto fixcursorpos; // correct passing end-of-line / end-of-screen
+            }
+            
+            escapestate = 0;
+            continue; 
+        }
+    
 
         if (c>=0x20) { 
             // 'Normal' char for which we have an image; font table starts at 0x20
@@ -170,7 +226,8 @@ void PiPyOS_bcm_framebuffer_putstring(char *s) {
                 continue; //ignore char
             }
         }
-        
+
+fixcursorpos:        
         // check end-of-line
         if ((_posx+1)*CHARWIDTH>fb_info.virt_width) {
             _posx=0;

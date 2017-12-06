@@ -36,12 +36,12 @@ The following functionality is currently implemented:
 
 * Starting Python upto the >>> prompt
 * Interface via the serial console
+* readline
+* Framebuffer (screen via HDMI) support
 
 The following functionality is foreseen (in order of development)
 
 * evaluation of real-time performance
-* readline
-* Framebuffer (screen via HDMI) support
 * USB keyboard support
 * SD-card interface
 * FAT filesystem support

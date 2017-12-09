@@ -18,19 +18,27 @@ FiqHandler:
     //DMB
     mcr p15, 0, r10, c7, c10, 5
     
-    //bl fiq
+    
     
     // [_cmp1] = (nexttime+=10)
+    
     ldr r8, _cmp1
     ldr r9, _nexttime
     add r9, #10
     str r9, _nexttime
     str r9, [r8]
 
+    // short delay
+    ldr r11, =#10
+lp:
+    subs r11, #1
+    bne lp
+
     //DMB
     mcr p15, 0, r10, c7, c10, 5
    
-    
+   
+    // write 2 to systimer_cs to clear flag
     ldr r8, _cs
     ldr r9, =#2
     str r9, [r8]
@@ -38,10 +46,7 @@ FiqHandler:
     //DMB
     mcr p15, 0, r10, c7, c10, 5
     
-    ldr r11, =#10
-lp:
-    subs r11, #1
-    bne lp
+
 
     // [_clear] = bit
     ldr r8, _clear

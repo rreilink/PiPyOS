@@ -30,94 +30,10 @@
 #include <stdio.h>
 #include "adaptors/bcmmailbox.h"
 
-#define EXTENDED_SHELL
-
-#define SHELL_WA_SIZE       THD_WA_SIZE(4096)
-
-#ifdef EXTENDED_SHELL
-
-#define TEST_WA_SIZE        THD_WA_SIZE(4096)
 
 char cmdline[1024];
 
-static void cmd_mem(BaseSequentialStream *chp, int argc, char *argv[]) {
-  size_t n, size;
 
-  UNUSED(argv);
-  if (argc > 0) {
-    chprintf(chp, "Usage: mem\r\n");
-    return;
-  }
-  n = chHeapStatus(NULL, &size);
-  chprintf(chp, "core free memory : %u bytes\r\n", chCoreStatus());
-  chprintf(chp, "heap fragments   : %u\r\n", n);
-  chprintf(chp, "heap free total  : %u bytes\r\n", size);
-}
-
-static void cmd_threads(BaseSequentialStream *chp, int argc, char *argv[]) {
-  static const char *states[] = {THD_STATE_NAMES};
-  Thread *tp;
-
-  UNUSED(argv);
-  if (argc > 0) {
-    chprintf(chp, "Usage: threads\r\n");
-    return;
-  }
-  chprintf(chp, "    addr    stack prio refs     state time    name\r\n");
-  tp = chRegFirstThread();
-  do {
-    chprintf(chp, "%.8lx %.8lx %4lu %4lu %9s %-8lu %s\r\n",
-            (uint32_t)tp, (uint32_t)tp->p_ctx.r13,
-            (uint32_t)tp->p_prio, (uint32_t)(tp->p_refs - 1),
-			 states[tp->p_state], (uint32_t)tp->p_time, tp->p_name);
-    tp = chRegNextThread(tp);
-  } while (tp != NULL);
-}
-
-static void cmd_test(BaseSequentialStream *chp, int argc, char *argv[]) {
-  Thread *tp;
-
-  UNUSED(argv);
-  if (argc > 0) {
-    chprintf(chp, "Usage: test\r\n");
-    return;
-  }
-  tp = chThdCreateFromHeap(NULL, TEST_WA_SIZE, chThdGetPriority(),
-                           TestThread, chp);
-  if (tp == NULL) {
-    chprintf(chp, "out of memory\r\n");
-    return;
-  }
-  chThdWait(tp);
-}
-
-#endif // EXTENDED_SHELL
-
-static void cmd_reboot(BaseSequentialStream *chp, int argc, char *argv[]) {
-  UNUSED(argv);
-  if (argc > 0) {
-    chprintf(chp, "Usage: reboot\r\n");
-    return;
-  }
-
-  /* Watchdog will cause reset after 1 tick.*/
-  watchdog_start(1);
-}
-
-static const ShellCommand commands[] = {
-#ifdef EXTENDED_SHELL
-  {"mem", cmd_mem},
-  {"threads", cmd_threads},
-  {"test", cmd_test},
-#endif
-  {"reboot", cmd_reboot},
-  {NULL, NULL}
-};
-
-static const ShellConfig shell_config = {
-  (BaseSequentialStream *)&SD1,
-  commands
-};
 
 static WORKING_AREA(waThread1, 128);
 static msg_t Thread1(void *p) {
@@ -125,8 +41,10 @@ static msg_t Thread1(void *p) {
   chRegSetThreadName("blinker");
   while (TRUE) {
     palClearPad(ONBOARD_LED_PORT, ONBOARD_LED_PAD);
+    palClearPad(GPIO18_PORT, GPIO18_PAD);
     chThdSleepMilliseconds(100);
     palSetPad(ONBOARD_LED_PORT, ONBOARD_LED_PAD);
+    palSetPad(GPIO18_PORT, GPIO18_PAD);
     chThdSleepMilliseconds(900);
   }
   return 0;
@@ -161,12 +79,6 @@ static msg_t PythonThread(void *p) {
   return 0;
 }
 
-
-struct {
-    int axis_cnt[6];
-    int axis_steps[6];
-    int total_steps;
-} stepper_state;
 
 static inline void dmb(void) {
     __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" : : "r" (0) : "memory");
@@ -275,12 +187,12 @@ int main(void) {
    */
   palSetPadMode(ONBOARD_LED_PORT, ONBOARD_LED_PAD, PAL_MODE_OUTPUT);
   palSetPadMode(GPIO18_PORT, GPIO18_PAD, PAL_MODE_OUTPUT);
-  
-  //SYSTIMER_CMP1 = next_time = SYSTIMER_CLO + 100;
+
+  /*
   FiqHandlerInit();
   SYSTIMER_CS = SYSTIMER_CS_MATCH1; //write to clear bit
-  //IRQ_ENABLE1 = 2;
   IRQ_FIQ_CONTROL = 0x80|1;
+  */
   
   /*
    * Creates the blinker thread.

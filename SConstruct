@@ -63,11 +63,12 @@ chibios = env_chibios.Object(
      Glob(chibios_path + 'os/kernel/src/*.c'),
      Glob(chibios_path + 'os/hal/src/*.c'),
      Glob(chibios_path + 'test/*.c'),
-     Glob(chibios_path + 'os/hal/platforms/BCM2835/*.c'),
+     skip(Glob(chibios_path + 'os/hal/platforms/BCM2835/*.c'),['hal_lld.c']),
      chibios_path + 'os/various/shell.c',
      chibios_path + 'os/various/chprintf.c',
      chibios_path + 'boards/RASPBERRYPI_MODB/board.c',
      'adaptors/os.c',
+     'adaptors/hal_lld.c',
     ])
     
 ######################

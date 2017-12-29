@@ -28,8 +28,9 @@ extern PyObject* PyInit_zipimport(void);
 extern PyObject* PyInit__codecs(void);
 extern PyObject* PyInit_errno(void);
 extern PyObject* PyInit__struct(void);
+extern PyObject* PyInit_math(void);
 extern PyObject* PyInit__rpi(void);
-
+extern PyObject* PyInit_app(void);
 
 /* -- ADDMODULE MARKER 1 -- */
 
@@ -49,7 +50,9 @@ struct _inittab _PyImport_Inittab[] = {
 {"_codecs", PyInit__codecs},
 {"errno", PyInit_errno},
 {"_struct", PyInit__struct},
+{"math", PyInit_math},
 {"_rpi", PyInit__rpi},
+{"app", PyInit_app},
 /* -- ADDMODULE MARKER 2 -- */
 
     /* This module lives in marshal.c */

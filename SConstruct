@@ -10,7 +10,7 @@ env_base = Environment(
     CCFLAGS=
     # '-mfloat-abi=soft -Wno-psabi '
     # '-march=armv7-a -mtune=cortex-a7 '
-    '-mcpu=arm1176jz-s -mno-thumb-interwork '
+    '-mcpu=arm1176jz-s -mfloat-abi=soft -mno-thumb-interwork '
     '-Wall -ffunction-sections -fdata-sections -g '
     '-O2'.split()
 
@@ -19,7 +19,7 @@ env_base = Environment(
 
     LINKFLAGS=
         '-mcpu=arm1176jz-s '
-        '-T deps/ChibiOS-RPi/os/ports/GCC/ARM/BCM2835/ld/BCM2835.ld -nostartfiles '
+        '-T BCM2835.ld -nostartfiles '
         '-Wl,--no-warn-mismatch,--gc-sections -mno-thumb-interwork '
     ,
     LINKCOM='$CC -o $TARGET $LINKFLAGS $_LIBDIRFLAGS $_LIBFLAGS $SOURCES',
@@ -45,12 +45,12 @@ env_chibios.Append(
     CCFLAGS=
     '-fomit-frame-pointer -Wall -Wextra -Wstrict-prototypes  -Wno-unused-parameter'.split(),
     
-    CPPPATH=['.'] + [chibios_path + x for x in [
+    CPPPATH=['.', 'adaptors'] + [chibios_path + x for x in [
         '',
         'os/ports/GCC/ARM', 'os/ports/GCC/ARM/BCM2835', 'os/kernel/include', 'test',
         'os/hal/include', 'os/hal/platforms/BCM2835', 'os/various',
         'boards/RASPBERRYPI_MODB'
-    ]]
+    ]] 
     )
 
 c = chibios_path
@@ -99,7 +99,8 @@ python = env_py.Object(
      'deps/cpython/Modules/getbuildinfo.c', 'deps/cpython/Modules/_weakref.c',
      'deps/cpython/Modules/posixmodule.c', 'deps/cpython/Modules/zipimport.c',
      'deps/cpython/Modules/_codecsmodule.c', 'deps/cpython/Modules/errnomodule.c',
-     'deps/cpython/Modules/_struct.c',
+     'deps/cpython/Modules/_struct.c', 'deps/cpython/Modules/mathmodule.c',
+     'deps/cpython/Modules/_math.c',
      'config.c',
      ]
     ,
@@ -109,10 +110,21 @@ python = env_py.Object(
     'adaptors/bcmmailbox.c',
     'adaptors/bcmframebuffer.c',
     'adaptors/_rpimodule.c',
-    # 'main_python.c'
+    'app/appmodule.c',
     ]
     )
 
+######################
+#     User app       #
+######################
+
+app = env_chibios.Object(skip(Glob('app/*.c'), ['appmodule.c']), Glob('app/*.S'))
+
+
+
+######################
+# Filesystem & rest  #
+######################
 
 mkinitfs = Command('initfs.bin', '', mkinitfs.main)
 AlwaysBuild(mkinitfs)
@@ -123,8 +135,9 @@ env_chibios.Depends(initfs, 'initfs.bin') # The include dependency for assembly 
 pipyos = env_chibios.Program('pipyos.elf', [
     chibios,
     python,
+    app,
     'main_pipyos.c',
-    'fiqhandler.S',
+    #'fiqhandler.S',
     '/opt/local/arm-none-eabi/lib/libm.a',
     initfs,
     ]

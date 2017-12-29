@@ -9,6 +9,7 @@
 #include <utime.h>
 #include <string.h>
 #include <fcntl.h>
+#include <errno.h>
 
 
 int clock_getres(clockid_t clk_id, struct timespec *res) { 
@@ -74,7 +75,8 @@ int getppid(void) {
 
 int _fstat(int fd, void *buf) {
     //called before printf can be used, so use chprintf
-//    chprintf((BaseSequentialStream *)&SD1, "FSTAT\n"); 
+//    chprintf((BaseSequentialStream *)&SD1, "FSTAT\n");
+    errno=ENOSYS;
     return -1;
 }
 
@@ -102,9 +104,6 @@ int _stat(const char *path, struct stat *buf) {
     file_rec_t *r = (file_rec_t *)&_binary_initfs_bin_start;
     char *s = &_binary_initfs_bin_start;
     int i=0;
-
-//    printf("STAT %s %d\n", path,(int)(&_binary_initfs_bin_start) );
-
     
     while(r[i].data_offs) {
         if (strcmp(&s[r[i].name_offs], path)==0) {
@@ -112,20 +111,18 @@ int _stat(const char *path, struct stat *buf) {
                 buf->st_size = 0;
                 buf->st_blocks = 0;
                 buf->st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
-//                printf("Found dir\n");
                 goto found;
             } else {
                 buf->st_size = r[i].size;
                 buf->st_blocks = (r[i].size+511)/512;
                 buf->st_mode = S_IFREG | S_IRUSR;
-//                printf("Found file\n");
                 goto found;
             }
         
         }
         i++;
     }
-
+    errno = ENOENT;
     return -1;
 found:
 
@@ -174,7 +171,7 @@ int _open(const char *pathname, int flags ) {
     }
 
     if (fd==-1) {
-        printf("TOO MANY OPEN FILES\n");
+        errno=EMFILE; // too many open files
         return -1;
     }
 
@@ -196,6 +193,7 @@ int _open(const char *pathname, int flags ) {
         i++;
     }
 
+    errno = ENOENT;
     return -1;
 
 }
@@ -203,8 +201,7 @@ int _open(const char *pathname, int flags ) {
 
 
 
-int _close(int fd) { 
-//    printf("CLOSE %d\n", fd);  
+int _close(int fd) {   
     openfiles[fd].data=0;
     return 0; 
 }
@@ -216,23 +213,28 @@ int _isatty(int fd) {
 }
 
 int _lseek(int fd, int offset, int whence) {
-
-//    printf("SEEK\n"); 
+    errno = ENOSYS;
     return -1; 
 }
 
 
 // TODO: this definition somewhere else
-extern void PiPyOS_bcm_framebuffer_putstring(char*, int);
+extern void PiPyOS_bcm_framebuffer_putstring(const char*, int);
 
 ssize_t _write(int fd, const void *buf, size_t count) {
-    PiPyOS_bcm_framebuffer_putstring(buf, count);
+    PiPyOS_bcm_framebuffer_putstring((const char *)buf, count);
     chSequentialStreamWrite((BaseSequentialStream *)&SD1, buf, count);
     return count; 
 
 }
+
+
+// todo: catch Ctrl+C from console, even when _read is not called
+int PyOS_InterruptOccurred(void) { 
+    return 0;
+}
+
 ssize_t _read(int fd, void *buf, size_t count) { 
-//    printf("READ\n");
     if (fd==0) {
         if (count ==0) return 0;
         while(chSequentialStreamRead((BaseSequentialStream *)&SD1, buf, 1)==0);
@@ -253,21 +255,41 @@ ssize_t _read(int fd, void *buf, size_t count) {
     return n;
 }
 
-int _unlink(const char *pathname) { printf("UNLINK\n"); return -1; }
-int _execve(const char *filename, char *const argv[], char *const envp[]) { printf("EXECVE\n"); return -1; }
-int execv(const char *path, char *const argv[]) { printf("EXECV\n"); return -1; }
-pid_t _fork(void) { printf("FORK\n"); return -1; }
-pid_t _wait(int *status) { printf("WAIT\n"); return -1; }
-int _link(const char *oldpath, const char *newpath) { printf("LINK\n"); return -1;}
+int _unlink(const char *pathname) { printf("UNLINK\n"); errno=ENOSYS; return -1; }
+int _execve(const char *filename, char *const argv[], char *const envp[]) { printf("EXECVE\n"); errno=ENOSYS; return -1; }
+int execv(const char *path, char *const argv[]) { printf("EXECV\n"); errno=ENOSYS; return -1; }
+pid_t _fork(void) { printf("FORK\n"); errno=ENOSYS; return -1; }
+pid_t _wait(int *status) { printf("WAIT\n"); errno=ENOSYS; return -1; }
+int _link(const char *oldpath, const char *newpath) { printf("LINK\n"); errno=ENOSYS; return -1;}
 
-int pipe(int pipefd[2]) { printf("PIPE\n"); return -1;}
+int pipe(int pipefd[2]) { printf("PIPE\n"); errno=ENOSYS; return -1;}
 
-int utime(const char *filename, const struct utimbuf *times) { printf("UTIME\n"); return -1;}
-mode_t umask(mode_t mask) { printf("UMASK\n"); return -1;}
-int rmdir(const char *pathname) { printf("RMDIR\n"); return -1;}
-int mkdir(const char *pathname, mode_t mode) { printf("MKDIR\n"); return -1;}
-int chdir(const char *path) { printf("CHDIR\n"); return -1;}
-int chmod(const char *path, mode_t mode) { printf("CHMOD\n"); return -1;}
+int utime(const char *filename, const struct utimbuf *times) { printf("UTIME\n"); errno=ENOSYS; return -1;}
+mode_t umask(mode_t mask) { printf("UMASK\n"); errno=ENOSYS; return -1;}
+int rmdir(const char *pathname) { printf("RMDIR\n"); errno=ENOSYS; return -1;}
+int mkdir(const char *pathname, mode_t mode) { printf("MKDIR\n"); errno=ENOSYS; return -1;}
+int chdir(const char *path) { printf("CHDIR\n"); errno=ENOSYS; return -1;}
+int chmod(const char *path, mode_t mode) { printf("CHMOD\n"); errno=ENOSYS; return -1;}
+
+
+static char *cwd = "/boot";
+
+char *getcwd(char *buf, size_t size) {
+    if (!buf) {  
+        errno = EINVAL;
+        return NULL;
+    }
+    
+    if (size<strlen(cwd)+1) {
+        errno = ERANGE;
+        return NULL;
+    }
+    strcpy(buf, cwd);
+    return buf;
+
+
+}
+
 
 // Group / user ids: only one user: 0
 uid_t getuid(void) { return 0; }
@@ -284,12 +306,18 @@ DIR *opendir(const char *name) {
     file_rec_t *r = (file_rec_t *)&_binary_initfs_bin_start;
     char *s = &_binary_initfs_bin_start;
 
+    int length;
+
     int i=0;
-    // TODO: strip trailing /
+    
+    // strip trailing slashes
+    length = strlen(name);
+    while(length && name[length-1] == '/') length--;
+    
+    // find the directory
     while(r[i].data_offs) {
-        if (strcmp(&s[r[i].name_offs], name)==0) {
+        if (strncmp(&s[r[i].name_offs], name, length)==0) {
             if (r[i].size==0xffffffff) {
-                
                 DIR *ret = malloc(sizeof(DIR));
                 ret->idx = i;
                 ret->idx_cur = i;
@@ -348,7 +376,7 @@ struct dirent *readdir(DIR *dirp) {
             }
         } 
     }
-//    printf("READDIR end\n");
+
     return NULL;
     
 }

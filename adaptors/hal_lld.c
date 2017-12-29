@@ -52,21 +52,14 @@
  */
 static void systimer_init( void )
 {
-/*  // 1 MHz clock, Counter=1000, 1 ms tick
-  ARM_TIMER_CTL = 0x003E0000;
-  ARM_TIMER_LOD = 1000-1;
-  ARM_TIMER_RLD = 1000-1;
-  ARM_TIMER_DIV = 0x000000F9;
-  ARM_TIMER_CLI = 0;
-  ARM_TIMER_CTL = 0x003E00A2;
-
-  //IRQ_ENABLE_BASIC = BIT(0);*/
-  
-  SYSTIMER_CMP1 = SYSTIMER_CLO + 1000;
+  SYSTIMER_CMP1 = SYSTIMER_CLO + (1000000/CH_FREQUENCY);
   SYSTIMER_CS = SYSTIMER_CS_MATCH1; //write to clear bit
   
   IRQ_ENABLE1 = 2;
 }
+
+
+void app_systick(void);
 
 /**
  * @brief Process system timer interrupts, if present.
@@ -75,7 +68,7 @@ static void systimer_init( void )
  */
 static void systimer_serve_interrupt( void )
 {
-  SYSTIMER_CMP1 += 1000;
+  SYSTIMER_CMP1 += (1000000/CH_FREQUENCY);
 
   // Update the system time
   chSysLockFromIsr();
@@ -83,6 +76,8 @@ static void systimer_serve_interrupt( void )
   chSysUnlockFromIsr();
 
   SYSTIMER_CS = SYSTIMER_CS_MATCH1; //write to clear bit
+  
+  app_systick();
 
 }
 
@@ -97,8 +92,14 @@ static void systimer_serve_interrupt( void )
 CH_IRQ_HANDLER(IrqHandler)
 {
   CH_IRQ_PROLOGUE();
-  asm volatile ("stmfd    sp!, {r4-r11}" : : : "memory"); //  These are not saved by tge IRQ PROLOGUE
+  asm volatile ("stmfd    sp!, {r4-r11}" : : : "memory"); //  These are not saved by the IRQ PROLOGUE
 
+/*  
+  unsigned mode;
+  asm volatile("mrs %0, CPSR" : "=r"(mode));
+  mini_uart_sendhex(mode, 1);
+  for(;;);
+*/
   uint32_t pend1;
 
   do {

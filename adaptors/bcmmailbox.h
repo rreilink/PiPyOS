@@ -23,6 +23,7 @@
 
 
 void PiPyOS_bcm_mailbox_write_read(int channel, void *data);
+int PiPyOS_bcm_get_set_property_tag(int tagid, void *data, int size);
 int PiPyOS_bcm_get_property_tag(int tagid, void *data, int size);
 
 #endif

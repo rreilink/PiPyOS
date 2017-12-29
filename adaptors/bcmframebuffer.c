@@ -117,7 +117,7 @@ void PiPyOS_bcm_framebuffer_init(int width, int height) {
  * count >=0: write count chars
  */
 
-void PiPyOS_bcm_framebuffer_putstring(char *s, int count) {
+void PiPyOS_bcm_framebuffer_putstring(const char *s, int count) {
     char c;
     uint8_t color;
     uint8_t *p, *p2;

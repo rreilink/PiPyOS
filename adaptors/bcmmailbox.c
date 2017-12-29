@@ -51,18 +51,19 @@ void PiPyOS_bcm_mailbox_write_read(int channel, void *data) {
 }
 
 /* id:   tag id
- * data: pointer to where to store the reply
+ * data: pointer to data to be sent; also where to store the reply
  * size: size of data area
  *
  * returns: size of response
  *          -1 for error
  */
-int PiPyOS_bcm_get_property_tag(int tagid, void *data, int size) {
+int PiPyOS_bcm_get_set_property_tag(int tagid, void *data, int size) {
     int buffersize = size + 32;
     int responsesize;
     char* buffer;
     unsigned long *buffer_aligned;
-
+    
+    if ((size & 0x3) != 0) return -1; //size must be whole words
     
     // get 16-byte aligned buffer
     buffer = malloc(buffersize + 15);
@@ -75,7 +76,10 @@ int PiPyOS_bcm_get_property_tag(int tagid, void *data, int size) {
     buffer_aligned[2] = tagid;
     buffer_aligned[3] = size;
     buffer_aligned[4] = 0;
-    memset(&buffer_aligned[5], 0, size + 12); // clear data + add sentinel tag (0,0,0)
+    
+    memcpy(&buffer_aligned[5], data, size);
+    memset(((char*)&buffer_aligned[5]) + size, 0, 12); // add sentinel tag (0,0,0)
+
     
     PiPyOS_bcm_mailbox_write_read(8, (void*)buffer_aligned);
     
@@ -96,6 +100,15 @@ int PiPyOS_bcm_get_property_tag(int tagid, void *data, int size) {
     
     return responsesize;
 
+}
+
+
+/* Short-cut for tags that only need reading; clears data and calls
+ * PiPyOS_bcm_get_set_property_tag. See PiPyOS_bcm_get_set_property_tag.
+ */
+int PiPyOS_bcm_get_property_tag(int tagid, void *data, int size) {
+    memset(data, 0, size); // clear initial data
+    return PiPyOS_bcm_get_set_property_tag(tagid, data, size);
 }
 
 

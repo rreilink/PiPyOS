@@ -18,7 +18,7 @@ These are identified by a file size of 0xffffffff
 
 import struct
 import os
-
+import glob
 
 class InitFS:
     recordformat = 'III' # name offset, data offset, file size
@@ -59,9 +59,10 @@ class InitFS:
         
         # Sort filetable to allow for proper directory listing:
         # For each directory, first the file, then subdir
-        filetable.sort(key=lambda x: (os.path.dirname(x[0]), x[2]==0xffffffff, x[0]))
-        
-        # print(filetable)
+        filetable.sort(key=lambda x: (x[0], x[2]==0xffffffff, x[0]))
+
+        # for line in filetable:
+        #     print(line)
         
         # Calculate number of bytes required for main table (add 1 for 0,0,0 sentinel)
         maintablesize = (len(filetable) + 1) * struct.calcsize(self.recordformat)
@@ -117,6 +118,9 @@ def main(target=None, source=None, env=None):
     fs.addfile('lib/posixpath.py','/boot/posixpath.py') 
     fs.addfile('lib/sysconfig.py','/boot/sysconfig.py') 
     fs.addfile('python/_readline.py','/boot/_readline.py')  
+    for file in glob.glob('app/fs/*'):
+        fs.addfile(file, '/app/' + file[7:])
+
     
     with open(outfile, 'wb') as file:
         file.write(fs.tostring())

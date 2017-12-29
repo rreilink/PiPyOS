@@ -23,8 +23,8 @@
  */
 __und_stack_size__	= 0x0004;
 __abt_stack_size__	= 0x0004;
-__fiq_stack_size__	= 0x0080;
-__irq_stack_size__	= 0x0080;
+__fiq_stack_size__	= 0x0200;
+__irq_stack_size__	= 0x0200;
 __svc_stack_size__	= 0x0004;
 __sys_stack_size__	= 0x0400;
 __stacks_total_size__	= __und_stack_size__ + __abt_stack_size__ + __fiq_stack_size__ + __irq_stack_size__ + __svc_stack_size__ + __sys_stack_size__;

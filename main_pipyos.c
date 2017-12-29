@@ -30,8 +30,7 @@
 #include <stdio.h>
 #include "adaptors/bcmmailbox.h"
 
-
-char cmdline[1024];
+char cmdline[1025];
 
 
 
@@ -50,7 +49,7 @@ static msg_t Thread1(void *p) {
   return 0;
 }
 
-static wchar_t *argv[] = { L"python", L"-B", L"-i", L"-c", L"import _rpi as r" };
+static wchar_t *argv[] = { L"python", L"-B", L"-i", L"-c", L"import _rpi as r, app as a" };
 extern const char *Py_FileSystemDefaultEncoding;
 
 
@@ -59,7 +58,12 @@ extern const char *Py_FileSystemDefaultEncoding;
 int Py_Main(int argc, wchar_t **argv);
 void PiPyOS_initreadline(void);
 
+const struct _frozen *PyImport_FrozenModules;
+
 static WORKING_AREA(waPythonThread, 1048576);
+
+uint8_t inbuf[8192];
+
 static msg_t PythonThread(void *p) {
   (void)p;
   chRegSetThreadName("python");
@@ -72,10 +76,46 @@ static msg_t PythonThread(void *p) {
 
   
   printf("GOGOGO!\n");
+ 
+ 
+  for(int i=0; i<16384;i++) inbuf[i] = 'X';
   
+  if (!sdcConnect(&SDCD1)) {
+
+    printf("OK\r\n");
+    printf("*** Card CSD content is: ");
+    printf("%08lX %08lX %08lX %08lX \r\n", (&SDCD1)->csd[3], (&SDCD1)->csd[2],
+                                      (&SDCD1)->csd[1], (&SDCD1)->csd[0]);
+
+    printf("Single aligned read...");
+    chThdSleepMilliseconds(100);
+    if (sdcRead(&SDCD1, 0, (uint8_t*)inbuf, 32)) {
+      printf("ERROR");
+    } else { 
+        printf(" OK\r\n"); 
+        for(int i=0; i<16384;i++) {
+            if ((i&127)==0) printf("\n");
+            printf("%c", inbuf[i]<32?'.':inbuf[i]);
+            //printf("%08lX ", inbuf[i]);
+
+        }
+        printf("\nDONE\n");
+        
+    };
+    chThdSleepMilliseconds(100);
+  } else {
+    printf("sdcConnect failed\r\n");
+  
+  }
+  
+/*  
   PiPyOS_initreadline();
   
   Py_Main(5, argv);
+  */
+  
+  //sdcConnect(&SDCD1);
+  
   return 0;
 }
 
@@ -154,8 +194,12 @@ void FiqHandlerInit(void);
  */
 int main(void) {
   const SerialConfig serialConfig ={921600};
+  const SDCConfig sdccfg = { 0 };
+
   halInit();
   chSysInit();
+
+  app_init();
 
   /*
    * Serial port initialization.
@@ -174,6 +218,8 @@ int main(void) {
 
   chprintf((BaseSequentialStream *)&SD1, "cmdline='%s'\r\n", cmdline);
 
+  sdcStart(&SDCD1, &sdccfg);
+
 //asm volatile ("mrs %0, cpsr" : "=rm" (cpsr));
 
   /*
@@ -185,14 +231,9 @@ int main(void) {
   /*
    * Set mode of onboard LED
    */
-  palSetPadMode(ONBOARD_LED_PORT, ONBOARD_LED_PAD, PAL_MODE_OUTPUT);
+  palSetPadMode(GPIO47_PORT, GPIO47_PAD, PAL_MODE_OUTPUT);
   palSetPadMode(GPIO18_PORT, GPIO18_PAD, PAL_MODE_OUTPUT);
 
-  /*
-  FiqHandlerInit();
-  SYSTIMER_CS = SYSTIMER_CS_MATCH1; //write to clear bit
-  IRQ_FIQ_CONTROL = 0x80|1;
-  */
   
   /*
    * Creates the blinker thread.

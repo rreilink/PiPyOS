@@ -45,7 +45,7 @@ env_chibios.Append(
     CCFLAGS=
     '-fomit-frame-pointer -Wall -Wextra -Wstrict-prototypes  -Wno-unused-parameter'.split(),
     
-    CPPPATH=['.', 'adaptors'] + [chibios_path + x for x in [
+    CPPPATH=['.', 'adaptors', 'deps/ff13a'] + [chibios_path + x for x in [
         '',
         'os/ports/GCC/ARM', 'os/ports/GCC/ARM/BCM2835', 'os/kernel/include', 'test',
         'os/hal/include', 'os/hal/platforms/BCM2835', 'os/various',
@@ -68,7 +68,10 @@ chibios = env_chibios.Object(
      chibios_path + 'os/various/chprintf.c',
      chibios_path + 'boards/RASPBERRYPI_MODB/board.c',
      'adaptors/os.c',
+     'adaptors/initfs.c',
      'adaptors/hal_lld.c',
+     'adaptors/ffadaptor.c',
+     skip(Glob('deps/ff13a/*.c'), ['diskio.c']),
     ])
     
 ######################
@@ -137,7 +140,6 @@ pipyos = env_chibios.Program('pipyos.elf', [
     python,
     app,
     'main_pipyos.c',
-    #'fiqhandler.S',
     '/opt/local/arm-none-eabi/lib/libm.a',
     initfs,
     ]

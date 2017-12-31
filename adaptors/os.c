@@ -3,7 +3,7 @@
 #include "chprintf.h"
 #include <sys/types.h>
 #include <sys/stat.h>
-#include "dirent.h"
+#include "dirent_os.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <utime.h>
@@ -11,6 +11,11 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#define DIR DIR_FF // ff.h defines the type DIR, but that is reserved for dirent.h. So define it to be DIR_FF
+#include "ff.h"
+#undef DIR
+
+#include "initfs.h"
 
 int clock_getres(clockid_t clk_id, struct timespec *res) { 
     res->tv_sec=0;
@@ -80,66 +85,130 @@ int _fstat(int fd, void *buf) {
     return -1;
 }
 
+
+
+
+
+
+typedef enum {
+    HANDLER_NONE=0, // closed file
+    HANDLER_FAT,     // most commonly used --> early in the list
+    HANDLER_INITFS,
+    HANDLER_FRAMEBUFFER,
+    HANDLER_SERIAL,
+    HANDLER_CNT    // total number of handers
+} handler_t;
+
+char *PiPyOS_filehandler_names[]={NULL, "/sd", "/boot", "/dev/fb", "/dev/serial0"};
+
 typedef struct {
-    unsigned int name_offs;
-    unsigned int data_offs;
-    unsigned int size;
-
-} file_rec_t;
-
-typedef struct {
-    char *data;
-    int pos;
-    int size;
-
+    handler_t handler;
+    union {
+        initfs_openfile_t initfs;
+        FIL ff_fil;
+    };
 } openfile_t;
 
-#define MAX_OPEN_FILES 20
+
+
+#define MAX_OPEN_FILES 100
 openfile_t openfiles[MAX_OPEN_FILES]={0};
 
+/* Convert FF library FRESULT enum to errno
+ * conversion table
+ */
+ 
+static int ff_result_errnos[] = {
+    0,      /* FR_OK = 0,               (0) Succeeded */
+    EIO,    /* FR_DISK_ERR,             (1) A hard error occurred in the low level disk I/O layer */
+    EFAULT, /* FR_INT_ERR,              (2) Assertion failed */
+    EIO,    /* FR_NOT_READY,            (3) The physical drive cannot work */
+    ENOENT, /* FR_NO_FILE,              (4) Could not find the file */
+    ENOENT, /* FR_NO_PATH,              (5) Could not find the path */
+    ENOENT, /* FR_INVALID_NAME,         (6) The path name format is invalid */
+    EACCES, /* FR_DENIED,               (7) Access denied due to prohibited access or directory full */
+    EEXIST, /* FR_EXIST,                (8) Access denied due to prohibited access */
+    EINVAL, /* FR_INVALID_OBJECT,       (9) The file/directory object is invalid */
+    EACCES, /* FR_WRITE_PROTECTED,      (10) The physical drive is write protected */
+    ENODEV, /* FR_INVALID_DRIVE,        (11) The logical drive number is invalid */
+    EINVAL, /* FR_NOT_ENABLED,          (12) The volume has no work area */
+    ENODEV, /* FR_NO_FILESYSTEM,        (13) There is no valid FAT volume */
+    EINTR,  /* FR_MKFS_ABORTED,         (14) The f_mkfs() aborted due to any problem */
+    EBUSY,  /* FR_TIMEOUT,              (15) Could not get a grant to access the volume within defined period */
+    EBUSY,  /* FR_LOCKED,               (16) The operation is rejected according to the file sharing policy */
+    ENOMEM, /* FR_NOT_ENOUGH_CORE,      (17) LFN working buffer could not be allocated */
+    EMFILE, /* FR_TOO_MANY_OPEN_FILES,  (18) Number of open files > FF_FS_LOCK */
+    EINVAL, /* FR_INVALID_PARAMETER     (19) Given parameter is invalid */
+};
 
-extern char _binary_initfs_bin_start;
-
-int _stat(const char *path, struct stat *buf) {
-    file_rec_t *r = (file_rec_t *)&_binary_initfs_bin_start;
-    char *s = &_binary_initfs_bin_start;
-    int i=0;
-    
-    while(r[i].data_offs) {
-        if (strcmp(&s[r[i].name_offs], path)==0) {
-            if (r[i].size==0xffffffff) {
-                buf->st_size = 0;
-                buf->st_blocks = 0;
-                buf->st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
-                goto found;
-            } else {
-                buf->st_size = r[i].size;
-                buf->st_blocks = (r[i].size+511)/512;
-                buf->st_mode = S_IFREG | S_IRUSR;
-                goto found;
-            }
-        
-        }
-        i++;
+/* Convert FF library FRESULT enum to errno
+ * if fresult==FR_OK (OK), return 0
+ * if fresult!=FR_OK (error), set errno appropriately and return -1
+ */
+static int ff_result_to_errno(int fresult) {
+    if (fresult==FR_OK) return 0;
+    if (fresult < (int)(sizeof(ff_result_errnos) / sizeof(ff_result_errnos[0]))) {
+        errno = ff_result_errnos[fresult];
+    } else {
+        errno = EINVAL;
     }
-    errno = ENOENT;
     return -1;
-found:
+}
 
-    buf->st_dev = 0;
-    buf->st_ino = 0;
+/* For a given full path (i.e. starting with /), determine which filesystem
+ * handler to use to access it. Also, if fspath!=NULL, it is pointed to the
+ * start of the path relative to the root of that filesystem, e.g. for
+ * pathname = "/sd/file.txt", fspath would be made to point to "/file.txt"
+ *
+ * Returns the handler id, or HANDLER_NONE (=0) when the pathname does not
+ * match any filesystem
+ */
+static handler_t handler_for_path(const char* pathname, const char** fspath) {
+    unsigned int handlerlen, pathlen;
+    char *handlername;
+    int handler;
+    pathlen = strlen(pathname);
+    
+    for(handler=1; handler < HANDLER_CNT;handler++) {
+        handlername = PiPyOS_filehandler_names[handler];
+        handlerlen = strlen(handlername);
+        if (strncmp(pathname, handlername, handlerlen)==0) { // path starts with handlername
+            if (pathlen == handlerlen) break;     // exact match
+            if (pathname[handlerlen]=='/') break; // must have a / after the handlername
+        }
+    }
+    if (handler == HANDLER_CNT) {
+        return HANDLER_NONE;
+    }
+    
+    if (fspath) {
+        *fspath = pathname + handlerlen;
+    }
+    
+    return handler;
+}
 
-    buf->st_nlink = 1;
-    buf->st_uid = 0;
-    buf->st_gid = 0;
-    buf->st_rdev = 0;
-    buf->st_atime = 0;
-    buf->st_mtime = 0;
-    buf->st_ctime = 0;
-    buf->st_blksize = 512;
 
+int _stat(const char *pathname, struct stat *buf) {
 
-    return 0;
+    handler_t handler;
+    
+    handler = handler_for_path(pathname, NULL);
+    
+    printf("STAT %s handler = %d\n", pathname, handler);
+    if (!handler) {
+        errno = ENOENT;
+        return -1;
+    }
+    
+    switch (handler) {
+        case HANDLER_INITFS:
+            return PiPyOS_initfs_stat(pathname, buf);
+        default:
+            errno = ENOENT;
+            return -1;
+    }
+
 }
 
 int lstat(const char *path, struct stat *buf) {
@@ -147,62 +216,85 @@ int lstat(const char *path, struct stat *buf) {
 }
 
 int fcntl(int fd, int cmd, ...) {
-//    printf("FCNTL\n");
     return 0; // TODO
 }
 
 
+/* File open switch logic
+ *
+ * Determines the filesystem handler for the given pathname, and calls the
+ * appropriate xxx_open function which does the actual opening of the file for
+ * that filesystem.
+ *
+ * Each xxx_open should return 0 on success. On failure, it should set errno and
+ * return -1.
+ *
+ */
+
 int _open(const char *pathname, int flags ) {
-    file_rec_t *r = (file_rec_t *)&_binary_initfs_bin_start;
-    char *s = &_binary_initfs_bin_start;
-
-    int i=0;
-
     int fd = -1;
- 
-//    printf("OPEN %s %d\n", pathname, (int)(&_binary_initfs_bin_start)); 
-   
+    int error;
+    int i;
+    const char *fspathname;
+    char *real;
+    handler_t handler;
+    
+    handler = handler_for_path(pathname, &fspathname);
+    
+    //printf("OPEN %s handler = %d = %s\n", pathname, handler, fspathname);
+
+    if (!handler) {
+        errno = ENOENT;
+        return -1;
+    }
+    
     // find file id to return (start with 3: 0-2 reserved for stdin/out/err)
     for(i=3;i<MAX_OPEN_FILES;i++) {
-        if (!openfiles[i].data) {
+        if (!openfiles[i].handler) {
             fd = i;
             break;
         }
     }
 
     if (fd==-1) {
-        errno=EMFILE; // too many open files
+        errno = EMFILE; // too many open files
         return -1;
     }
 
-    i = 0;
-    while(r[i].data_offs) {
-        if (strcmp(&s[r[i].name_offs], pathname)==0) {
-            if (r[i].size==0xffffffff) {
-//                printf("Open found dir\n");
-                return -1;
-            } else {
-                openfiles[fd].data = &s[r[i].data_offs];
-                openfiles[fd].pos = 0;
-                openfiles[fd].size = r[i].size;
-//                printf("open found file %d\n", fd);
-                return fd;
-            }
+    switch (handler) {
+        case HANDLER_FAT:
+            error = ff_result_to_errno(f_open(&openfiles[fd].ff_fil, fspathname, FA_READ));
+            break;
+        case HANDLER_INITFS:
+            error = PiPyOS_initfs_open(&openfiles[fd].initfs, pathname, flags);
+            break;
+        default:
+            errno = ENOENT;
+            error = -1;
         
-        }
-        i++;
+    }
+    
+    if (!error) {
+        openfiles[fd].handler = handler;
+        printf("OPEN succes %d\n", fd);
+        return fd;
+
     }
 
-    errno = ENOENT;
     return -1;
-
 }
 
 
 
 
-int _close(int fd) {   
-    openfiles[fd].data=0;
+int _close(int fd) {
+    switch(openfiles[fd].handler) {
+        case HANDLER_FAT:
+            break;
+        default:
+            ;
+    }
+    openfiles[fd].handler=0;
     return 0; 
 }
 
@@ -234,7 +326,11 @@ int PyOS_InterruptOccurred(void) {
     return 0;
 }
 
+
 ssize_t _read(int fd, void *buf, size_t count) { 
+    int error;
+    unsigned int bytesread;
+    
     if (fd==0) {
         if (count ==0) return 0;
         while(chSequentialStreamRead((BaseSequentialStream *)&SD1, buf, 1)==0);
@@ -242,17 +338,23 @@ ssize_t _read(int fd, void *buf, size_t count) {
     
     }
 
-
-    if (!openfiles[fd].data) {
-        printf("READ from closed file %d\n", fd);
-        return -1 ;
+    switch(openfiles[fd].handler) {
+        case HANDLER_NONE:
+            return -1;
+        case HANDLER_FAT:
+            error = f_read(&openfiles[fd].ff_fil, buf, count, &bytesread);
+            if (error) {
+                return ff_result_to_errno(error);
+            } else {
+                return bytesread;
+            }
+        case HANDLER_INITFS:
+            return PiPyOS_initfs_read(&openfiles[fd].initfs, buf, count);
+        default:
+            errno = EACCES;
+            return -1 ;
     }
-    int n = openfiles[fd].size - openfiles[fd].pos;
-    if (n>((int)count)) n = count;
-    memcpy(buf, openfiles[fd].data + openfiles[fd].pos, n);
-    openfiles[fd].pos += n;
 
-    return n;
 }
 
 int _unlink(const char *pathname) { printf("UNLINK\n"); errno=ENOSYS; return -1; }
@@ -300,89 +402,104 @@ gid_t getegid(void) { return 0; }
 char *ttyname(int fd) {  return NULL; }
 
 
-//TODO: able to list root directory
 
-DIR *opendir(const char *name) {
-    file_rec_t *r = (file_rec_t *)&_binary_initfs_bin_start;
-    char *s = &_binary_initfs_bin_start;
-
-    int length;
-
-    int i=0;
+DIR *opendir(const char *pathname) {
+    DIR *ret = NULL;
+    handler_t handler;
+    int error=-1;
+    const char *fspathname;    
+    handler = handler_for_path(pathname, &fspathname);
     
-    // strip trailing slashes
-    length = strlen(name);
-    while(length && name[length-1] == '/') length--;
+    printf("OPENDIR %s handler = %d = %s\n", pathname, handler, fspathname);
     
-    // find the directory
-    while(r[i].data_offs) {
-        if (strncmp(&s[r[i].name_offs], name, length)==0) {
-            if (r[i].size==0xffffffff) {
-                DIR *ret = malloc(sizeof(DIR));
-                ret->idx = i;
-                ret->idx_cur = i;
-            
-                return ret;              
-              
-                
-            }
-        }
-        i++;
+    if (handler == HANDLER_NONE) {
+        errno = ENOENT;    
+        return NULL;
     }
-
-
-    return NULL;
- 
-
+    
+    ret = malloc(sizeof(DIR));
+    
+    switch(handler) {
+        case HANDLER_FAT:
+            error = f_opendir(&ret->ff_dir, fspathname);
+            if (error) {
+                ff_result_to_errno(error);
+            }
+            break;
+        case HANDLER_INITFS:
+            error = PiPyOS_initfs_opendir(pathname, ret);
+            break;
+        default: // Other handlers are char devices
+            errno = ENOTDIR;
+    }
+    
+    if (error) {
+        free(ret);
+        ret = NULL;
+    } else {
+        // Store handler so readdir can call the appropriate xxx_readdir
+        ret->handler = handler;
+    }    
+    
+    return ret;
 }
 
+
+/* Return the next item in a directory listing
+ *
+ * On end-of-dir, NULL is returned and errno is unchanged.
+ * On error, NULL is returned and errno is set.
+ *
+ */
 struct dirent *readdir(DIR *dirp) {
-    file_rec_t *r = (file_rec_t *)&_binary_initfs_bin_start;
-    char *s = &_binary_initfs_bin_start;
-    char *parent_name = &s[r[dirp->idx].name_offs];
 
-    // todo: readdir does not work for /
-    
-    int l = strlen(parent_name);
+    FILINFO info;
+    int error;
+    struct dirent *ret; // Do NOT set value here, to make sure all code paths are covered
 
-    // Loop over all remaining directory entries
-    while (r[dirp->idx_cur].data_offs) {
-        dirp->idx_cur++;
-    
-        char *current_name = &s[r[dirp->idx_cur].name_offs];
-    
-        // if this dir or file is not a subdir of the parent, we are done
-        if (strncmp(current_name, parent_name, l)!=0) {
-            break;
-        }
-        
-        char *subpath = current_name + l; // the part below the parent
-        if (*subpath=='/') { // should always be true, but check to be sure
-            subpath++; // strip leading /
-            if (!strchr(subpath, '/')) {
-                // No / in subpath, so it is a direct child (no file in a sub-dir)
-                            
-                l = strlen(subpath);
-                if (l >= NAME_MAX) {
-                    return NULL; //filename too long
+    switch(dirp->handler) {
+        case HANDLER_FAT:
+            error = f_readdir(&dirp->ff_dir, &info);
+            if (error) {
+                // Error
+                ff_result_to_errno(error);
+                ret = NULL;
+            } else {
+                if (info.fname[0] == 0) {
+                    // End of directory
+                    ret = NULL;
+                } else {
+                    strcpy(dirp->dirent.d_name, info.fname);
+                    dirp->dirent.d_ino = 0; // No access to inode
+                    ret = &dirp->dirent;
                 }
-                
-                // Copy info of the current listing into dirp->dirent
-                memcpy(dirp->dirent.d_name, subpath, l+1);
-                dirp->dirent.d_ino = dirp->idx_cur;
-                    
-                return &dirp->dirent;                
-                
             }
-        } 
+            break;
+        case HANDLER_INITFS:
+            // PiPyOS_initfs_readdir returns 0 on success, 1 on eof
+            // On failure, -1 is returned and errno is set
+            error = PiPyOS_initfs_readdir(dirp);
+            if (error) {
+                ret = NULL;
+            } else {
+                ret = &dirp->dirent;
+            }
+            break;
+        default:
+            errno = ENOTDIR;
+            ret = NULL;
     }
-
-    return NULL;
+    return ret;
     
 }
 
 
 int closedir(DIR *dirp) {
+    switch(dirp->handler) {
+        case HANDLER_FAT:
+            f_closedir(&dirp->ff_dir);
+            break;
+    }
     free(dirp); 
     return 0;
 }

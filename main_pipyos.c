@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "adaptors/bcmmailbox.h"
+#include "ff.h"
 
 char cmdline[1025];
 
@@ -58,7 +59,7 @@ extern const char *Py_FileSystemDefaultEncoding;
 int Py_Main(int argc, wchar_t **argv);
 void PiPyOS_initreadline(void);
 
-const struct _frozen *PyImport_FrozenModules;
+
 
 static WORKING_AREA(waPythonThread, 1048576);
 
@@ -87,7 +88,7 @@ static msg_t PythonThread(void *p) {
     printf("%08lX %08lX %08lX %08lX \r\n", (&SDCD1)->csd[3], (&SDCD1)->csd[2],
                                       (&SDCD1)->csd[1], (&SDCD1)->csd[0]);
 
-    printf("Single aligned read...");
+/*    printf("Single aligned read...");
     chThdSleepMilliseconds(100);
     if (sdcRead(&SDCD1, 0, (uint8_t*)inbuf, 32)) {
       printf("ERROR");
@@ -102,17 +103,35 @@ static msg_t PythonThread(void *p) {
         printf("\nDONE\n");
         
     };
-    chThdSleepMilliseconds(100);
+    chThdSleepMilliseconds(100);*/
   } else {
     printf("sdcConnect failed\r\n");
   
   }
   
-/*  
+  
+  FRESULT fr;
+  FIL fp;
+  uint8_t buffer[1024];
+  unsigned int br;
+  FATFS fs;
+  f_mount(&fs, "", 0);
+  fr = f_open(&fp, "cmdline.txt", FA_READ);
+  printf("open returned %d\n" , fr);
+  if (fr==0) {
+
+    fr = f_read(&fp,buffer, sizeof(buffer), &br);
+    printf("read returned %d; read %d bytes\n" , fr, br);
+    if (fr==0) {
+        PiPyOS_bcm_framebuffer_putstring(buffer, br);
+    }
+  }
+  
+  
   PiPyOS_initreadline();
   
   Py_Main(5, argv);
-  */
+  
   
   //sdcConnect(&SDCD1);
   

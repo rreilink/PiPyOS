@@ -500,20 +500,47 @@ int _stat(const char *pathname, struct stat *buf) {
     handler_t handler;
     const char *fspathname;   
     handler = handler_for_path(pathname, &fspathname);
+    int error;
+    FILINFO info;    
     
-    //printf("STAT %s handler = %d - %s\n", pathname, handler, fspathname);
+    printf("STAT %s handler = %d - %s\n", pathname, handler, fspathname);
     if (!handler) {
         errno = ENOENT;
         return -1;
     }
     
     switch (handler) {
+        case HANDLER_FAT:
+            error = f_stat(fspathname, &info);
+            if (error) {
+                error = ff_result_to_errno(error);
+            } else {
+                memset(buf, 0, sizeof(*buf));
+                
+                if (info.fattrib & AM_DIR) {
+                    buf->st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
+                } else {
+                    buf->st_size = info.fsize;
+                    buf->st_blocks = (info.fsize+511)/512;
+                    buf->st_mode = S_IFREG | S_IRUSR;
+                }
+                buf->st_ino = 0; // no access to inode from FatFs lib
+                buf->st_nlink = 1;
+                buf->st_blksize = 512;
+            
+                error = 0;
+            }
+            break;
         case HANDLER_INITFS:
-            return PiPyOS_initfs_stat(fspathname, buf);
+            error = PiPyOS_initfs_stat(fspathname, buf);
+            break;
         default:
             errno = ENOENT;
-            return -1;
+            error = -1;
     }
+    
+    if (!error) buf->st_dev = handler;
+    return error;
 
 }
 

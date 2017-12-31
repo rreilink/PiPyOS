@@ -152,7 +152,7 @@ int PiPyOS_initfs_stat(const char *pathname, struct stat *buf) {
 found:
 
     buf->st_dev = 0;
-    buf->st_ino = 0;
+    buf->st_ino = i;
 
     buf->st_nlink = 1;
     buf->st_uid = 0;

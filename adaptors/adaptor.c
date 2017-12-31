@@ -89,7 +89,10 @@ void PiPyOS_initreadline(void) {
     PyOS_ReadlineFunctionPointer = PiPyOS_readline;
 }
 
-
+// todo: catch Ctrl+C from console, even when _read is not called
+int PyOS_InterruptOccurred(void) { 
+    return 0;
+}
 
 void PyOS_InitInterrupts(void) { }
 

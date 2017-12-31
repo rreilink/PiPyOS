@@ -29,7 +29,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "adaptors/bcmmailbox.h"
+#include "os.h"
 #include "ff.h"
+#include "bcm2835.h"
 
 char cmdline[1025];
 
@@ -63,8 +65,6 @@ void PiPyOS_initreadline(void);
 
 static WORKING_AREA(waPythonThread, 1048576);
 
-uint8_t inbuf[8192];
-
 static msg_t PythonThread(void *p) {
   (void)p;
   chRegSetThreadName("python");
@@ -77,55 +77,19 @@ static msg_t PythonThread(void *p) {
 
   
   printf("GOGOGO!\n");
- 
- 
-  for(int i=0; i<16384;i++) inbuf[i] = 'X';
   
   if (!sdcConnect(&SDCD1)) {
 
     printf("OK\r\n");
-    printf("*** Card CSD content is: ");
-    printf("%08lX %08lX %08lX %08lX \r\n", (&SDCD1)->csd[3], (&SDCD1)->csd[2],
-                                      (&SDCD1)->csd[1], (&SDCD1)->csd[0]);
-
-/*    printf("Single aligned read...");
-    chThdSleepMilliseconds(100);
-    if (sdcRead(&SDCD1, 0, (uint8_t*)inbuf, 32)) {
-      printf("ERROR");
-    } else { 
-        printf(" OK\r\n"); 
-        for(int i=0; i<16384;i++) {
-            if ((i&127)==0) printf("\n");
-            printf("%c", inbuf[i]<32?'.':inbuf[i]);
-            //printf("%08lX ", inbuf[i]);
-
-        }
-        printf("\nDONE\n");
-        
-    };
-    chThdSleepMilliseconds(100);*/
+  
   } else {
     printf("sdcConnect failed\r\n");
   
   }
   
-  
-  FRESULT fr;
-  FIL fp;
-  uint8_t buffer[1024];
-  unsigned int br;
   FATFS fs;
   f_mount(&fs, "", 0);
-  fr = f_open(&fp, "cmdline.txt", FA_READ);
-  printf("open returned %d\n" , fr);
-  if (fr==0) {
 
-    fr = f_read(&fp,buffer, sizeof(buffer), &br);
-    printf("read returned %d; read %d bytes\n" , fr, br);
-    if (fr==0) {
-        PiPyOS_bcm_framebuffer_putstring(buffer, br);
-    }
-  }
   
   
   PiPyOS_initreadline();
@@ -213,8 +177,10 @@ void FiqHandlerInit(void);
  */
 int main(void) {
   const SerialConfig serialConfig ={921600};
-  const SDCConfig sdccfg = { 0 };
-
+  const SDCConfig sdccfg = { 0 }; 
+  
+  AUX_MU_CNTL_REG = 0; // disable uart RX during setup of HAL. This prevents a random char to appear in the input buffer
+  
   halInit();
   chSysInit();
 
@@ -226,6 +192,8 @@ int main(void) {
   sdStart(&SD1, &serialConfig); 
   chprintf((BaseSequentialStream *)&SD1, "Main (SD1 started)\r\n");
   PiPyOS_bcm_framebuffer_init(0, 0);
+  os_init_stdio();
+  
   initcache();
 
   int cmdline_length = PiPyOS_bcm_get_property_tag(0x50001, cmdline, sizeof(cmdline)-1);

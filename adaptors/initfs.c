@@ -5,7 +5,6 @@
 #include <sys/stat.h>
 #include "initfs.h"
 
-
 typedef struct {
     unsigned int name_offs;
     unsigned int data_offs;
@@ -19,8 +18,7 @@ int PiPyOS_initfs_open(initfs_openfile_t *file, const char *pathname, int flags)
     initfs_rec_t *r = (initfs_rec_t *)&_binary_initfs_bin_start;
     char *s = &_binary_initfs_bin_start;
     
-    int i = 0;
-    while(r[i].data_offs) {
+    for(int i=0;r[i].data_offs;i++) {
         if (strcmp(&s[r[i].name_offs], pathname)==0) {
             if (r[i].size==0xffffffff) {
                 return -1; // Trying to open a directory
@@ -32,7 +30,6 @@ int PiPyOS_initfs_open(initfs_openfile_t *file, const char *pathname, int flags)
             }
         
         }
-        i++;
     }
 
     errno = ENOENT;
@@ -58,24 +55,19 @@ int PiPyOS_initfs_opendir(const char *pathname, DIR *dir) {
 
     int length;
 
-    int i=0;
-    
     // strip trailing slashes
     length = strlen(pathname);
     while(length && pathname[length-1] == '/') length--;
     
     // find the directory
-    while(r[i].data_offs) {
+    for(int i=0; r[i].data_offs; i++) {
         if (strncmp(&s[r[i].name_offs], pathname, length)==0) {
             if (r[i].size==0xffffffff) {
-                dir->initfs.idx = i;
-                dir->initfs.idx_cur = i;
-                return 0;              
-              
-                
+                dir->initfs.idx_parent = i;
+                dir->initfs.idx_cur = i+1;
+                return 0;                 
             }
         }
-        i++;
     }
     errno = ENOENT;
     return -1;
@@ -91,18 +83,15 @@ int PiPyOS_initfs_opendir(const char *pathname, DIR *dir) {
 int PiPyOS_initfs_readdir(DIR *dirp) {
     initfs_rec_t *r = (initfs_rec_t *)&_binary_initfs_bin_start;
     char *s = &_binary_initfs_bin_start;
-    char *parent_name = &s[r[dirp->initfs.idx].name_offs];
+    char *parent_name = &s[r[dirp->initfs.idx_parent].name_offs];
 
-    // todo: readdir does not work for /
-    
     int l = strlen(parent_name);
 
     // Loop over all remaining directory entries
-    while (r[dirp->initfs.idx_cur].data_offs) {
-        dirp->initfs.idx_cur++; //TODO: can we go out-of-bounds here?
+    for (; r[dirp->initfs.idx_cur].data_offs; dirp->initfs.idx_cur++) {
     
         char *current_name = &s[r[dirp->initfs.idx_cur].name_offs];
-    
+
         // if this dir or file is not a subdir of the parent, we are done
         if (strncmp(current_name, parent_name, l)!=0) {
             break;
@@ -122,12 +111,13 @@ int PiPyOS_initfs_readdir(DIR *dirp) {
                 
                 // Copy info of the current listing into dirp->dirent
                 memcpy(dirp->dirent.d_name, subpath, l+1);
-                //dirp->dirent.d_ino = dirp->initfs.idx_cur;
-                    
+                dirp->dirent.d_ino = dirp->initfs.idx_cur;
+                dirp->initfs.idx_cur++;
                 return 0;                
                 
             }
         } 
+
     }
 
     return 1;

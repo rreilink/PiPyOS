@@ -20,9 +20,10 @@ typedef struct{
     struct dirent dirent;
     union { // A union of structs for all possible filesystem handlers
         struct {
-            int idx;
+            int idx_parent;
             int idx_cur;
         } initfs;
+        unsigned int rootfs_idx;
         DIR_FF ff_dir;
     };
 } DIR;

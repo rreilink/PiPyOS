@@ -59,7 +59,7 @@ class InitFS:
         
         # Sort filetable to allow for proper directory listing:
         # For each directory, first the file, then subdir
-        filetable.sort(key=lambda x: (x[0], x[2]==0xffffffff, x[0]))
+        filetable.sort(key=lambda x: (x[0], x[1] is None, x[0]))
 
         # for line in filetable:
         #     print(line)
@@ -112,14 +112,14 @@ def main(target=None, source=None, env=None):
         '_collections_abc.py',
         'struct.py',
         'codecs.py']:
-            fs.addfile('deps/cpython/Lib/' + file, '/boot/' + file)
+            fs.addfile('deps/cpython/Lib/' + file, '/' + file)
     
     # 
-    fs.addfile('lib/posixpath.py','/boot/posixpath.py') 
-    fs.addfile('lib/sysconfig.py','/boot/sysconfig.py') 
-    fs.addfile('python/_readline.py','/boot/_readline.py')  
-    for file in glob.glob('app/fs/*'):
-        fs.addfile(file, '/app/' + file[7:])
+    fs.addfile('lib/posixpath.py','/posixpath.py') 
+    fs.addfile('lib/sysconfig.py','/sysconfig.py') 
+    fs.addfile('python/_readline.py','/_readline.py')  
+    for file in glob.glob('app/target/*'):
+        fs.addfile(file, '/app/' + file[11:])
 
     
     with open(outfile, 'wb') as file:

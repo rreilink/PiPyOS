@@ -96,16 +96,18 @@ typedef enum {
     HANDLER_INITFS,
     HANDLER_FRAMEBUFFER,
     HANDLER_SERIAL,
+    HANDLER_ROOT,
     HANDLER_CNT    // total number of handers
 } handler_t;
 
-char *PiPyOS_filehandler_names[]={NULL, "/sd", "/boot", "/dev/fb", "/dev/serial0"};
+char *PiPyOS_filehandler_names[]={NULL, "/sd", "/boot", "/fb", "/serial", NULL};
 
 typedef struct {
     handler_t handler;
     union {
         initfs_openfile_t initfs;
         FIL ff_fil;
+        BaseSequentialStream* serialstream;
     };
 } openfile_t;
 
@@ -113,6 +115,25 @@ typedef struct {
 
 #define MAX_OPEN_FILES 100
 openfile_t openfiles[MAX_OPEN_FILES]={0};
+
+
+static char *cwd = "/boot";
+
+char *getcwd(char *buf, size_t size) {
+    if (!buf) {  
+        errno = EINVAL;
+        return NULL;
+    }
+    
+    if (size<strlen(cwd)+1) {
+        errno = ERANGE;
+        return NULL;
+    }
+    strcpy(buf, cwd);
+    return buf;
+
+
+}
 
 /* Convert FF library FRESULT enum to errno
  * conversion table
@@ -172,13 +193,18 @@ static handler_t handler_for_path(const char* pathname, const char** fspath) {
     for(handler=1; handler < HANDLER_CNT;handler++) {
         handlername = PiPyOS_filehandler_names[handler];
         handlerlen = strlen(handlername);
-        if (strncmp(pathname, handlername, handlerlen)==0) { // path starts with handlername
+        if (handlername && strncmp(pathname, handlername, handlerlen)==0) { // path starts with handlername
             if (pathlen == handlerlen) break;     // exact match
             if (pathname[handlerlen]=='/') break; // must have a / after the handlername
         }
     }
     if (handler == HANDLER_CNT) {
-        return HANDLER_NONE;
+        if (strcmp(pathname, "/")==0) { // only for /, not for subpaths of it, to be able to list root directory
+            handler = HANDLER_ROOT;
+            handlerlen = 1;
+        } else {
+            return HANDLER_NONE;
+        }
     }
     
     if (fspath) {
@@ -188,36 +214,14 @@ static handler_t handler_for_path(const char* pathname, const char** fspath) {
     return handler;
 }
 
-
-int _stat(const char *pathname, struct stat *buf) {
-
-    handler_t handler;
-    
-    handler = handler_for_path(pathname, NULL);
-    
-    printf("STAT %s handler = %d\n", pathname, handler);
-    if (!handler) {
-        errno = ENOENT;
-        return -1;
+void os_init_stdio(void) {
+    int i;
+    for(i=0;i<3;i++) {
+        openfiles[i].handler = HANDLER_SERIAL;
+        openfiles[i].serialstream = (BaseSequentialStream *)&SD1;
     }
-    
-    switch (handler) {
-        case HANDLER_INITFS:
-            return PiPyOS_initfs_stat(pathname, buf);
-        default:
-            errno = ENOENT;
-            return -1;
-    }
-
 }
 
-int lstat(const char *path, struct stat *buf) {
-    return stat(path, buf); // Links are not supported; lstat = stat
-}
-
-int fcntl(int fd, int cmd, ...) {
-    return 0; // TODO
-}
 
 
 /* File open switch logic
@@ -236,10 +240,10 @@ int _open(const char *pathname, int flags ) {
     int error;
     int i;
     const char *fspathname;
-    char *real;
     handler_t handler;
     
     handler = handler_for_path(pathname, &fspathname);
+    //TODO: check flags
     
     //printf("OPEN %s handler = %d = %s\n", pathname, handler, fspathname);
 
@@ -248,8 +252,8 @@ int _open(const char *pathname, int flags ) {
         return -1;
     }
     
-    // find file id to return (start with 3: 0-2 reserved for stdin/out/err)
-    for(i=3;i<MAX_OPEN_FILES;i++) {
+    // find file id to return
+    for(i=0;i<MAX_OPEN_FILES;i++) {
         if (!openfiles[i].handler) {
             fd = i;
             break;
@@ -266,7 +270,24 @@ int _open(const char *pathname, int flags ) {
             error = ff_result_to_errno(f_open(&openfiles[fd].ff_fil, fspathname, FA_READ));
             break;
         case HANDLER_INITFS:
-            error = PiPyOS_initfs_open(&openfiles[fd].initfs, pathname, flags);
+            error = PiPyOS_initfs_open(&openfiles[fd].initfs, fspathname, flags);
+            break;
+            
+        case HANDLER_FRAMEBUFFER:
+            error = 0;
+            break;
+        case HANDLER_SERIAL:
+            if (strcmp(fspathname, "/0")==0) {
+                error = 0;
+                openfiles[fd].serialstream = (BaseSequentialStream *)&SD1;
+            } else {
+                error = -1;
+                errno = ENOENT;
+            }
+            break;
+        case HANDLER_ROOT:
+            errno = EISDIR;
+            error = -1;
             break;
         default:
             errno = ENOENT;
@@ -275,8 +296,8 @@ int _open(const char *pathname, int flags ) {
     }
     
     if (!error) {
+        //printf("OPEN %s = %d\n", pathname, fd);
         openfiles[fd].handler = handler;
-        printf("OPEN succes %d\n", fd);
         return fd;
 
     }
@@ -288,25 +309,21 @@ int _open(const char *pathname, int flags ) {
 
 
 int _close(int fd) {
+    int error=0;
+    if (fd<=2) { // Do not allow to close stdio
+        error = EPERM;
+        return -1;
+    }
+    
     switch(openfiles[fd].handler) {
         case HANDLER_FAT:
+            error = ff_result_to_errno(f_close(&openfiles[fd].ff_fil));
             break;
         default:
             ;
     }
-    openfiles[fd].handler=0;
-    return 0; 
-}
-
-int _isatty(int fd) { 
-    //called before printf can be used, so don't use printf here!
-    return fd<=2; 
-
-}
-
-int _lseek(int fd, int offset, int whence) {
-    errno = ENOSYS;
-    return -1; 
+    openfiles[fd].handler=0;//Mark as closed even if there were errors
+    return error; 
 }
 
 
@@ -314,32 +331,27 @@ int _lseek(int fd, int offset, int whence) {
 extern void PiPyOS_bcm_framebuffer_putstring(const char*, int);
 
 ssize_t _write(int fd, const void *buf, size_t count) {
-    PiPyOS_bcm_framebuffer_putstring((const char *)buf, count);
-    chSequentialStreamWrite((BaseSequentialStream *)&SD1, buf, count);
-    return count; 
-
-}
-
-
-// todo: catch Ctrl+C from console, even when _read is not called
-int PyOS_InterruptOccurred(void) { 
-    return 0;
+    switch(openfiles[fd].handler) {
+        case HANDLER_FRAMEBUFFER:
+            PiPyOS_bcm_framebuffer_putstring((const char *)buf, count);
+            return count;
+        case HANDLER_SERIAL:
+            chSequentialStreamWrite(openfiles[fd].serialstream, buf, count);
+            return count;
+        default:
+            errno = EBADF; // no write to all other file handlers including HANDLER_NONE (closed file)
+            return -1;
+    }
 }
 
 
 ssize_t _read(int fd, void *buf, size_t count) { 
     int error;
     unsigned int bytesread;
-    
-    if (fd==0) {
-        if (count ==0) return 0;
-        while(chSequentialStreamRead((BaseSequentialStream *)&SD1, buf, 1)==0);
-        return 1;
-    
-    }
 
     switch(openfiles[fd].handler) {
         case HANDLER_NONE:
+            errno = EBADF;
             return -1;
         case HANDLER_FAT:
             error = f_read(&openfiles[fd].ff_fil, buf, count, &bytesread);
@@ -350,67 +362,25 @@ ssize_t _read(int fd, void *buf, size_t count) {
             }
         case HANDLER_INITFS:
             return PiPyOS_initfs_read(&openfiles[fd].initfs, buf, count);
+        case HANDLER_SERIAL:
+            if (count ==0) return 0;
+            while(chSequentialStreamRead(openfiles[fd].serialstream, buf, 1)==0);
+            return 1;
         default:
-            errno = EACCES;
-            return -1 ;
+            errno = EBADF; // no read from all other file handlers including HANDLER_NONE (closed file)
+            return -1;
     }
 
 }
-
-int _unlink(const char *pathname) { printf("UNLINK\n"); errno=ENOSYS; return -1; }
-int _execve(const char *filename, char *const argv[], char *const envp[]) { printf("EXECVE\n"); errno=ENOSYS; return -1; }
-int execv(const char *path, char *const argv[]) { printf("EXECV\n"); errno=ENOSYS; return -1; }
-pid_t _fork(void) { printf("FORK\n"); errno=ENOSYS; return -1; }
-pid_t _wait(int *status) { printf("WAIT\n"); errno=ENOSYS; return -1; }
-int _link(const char *oldpath, const char *newpath) { printf("LINK\n"); errno=ENOSYS; return -1;}
-
-int pipe(int pipefd[2]) { printf("PIPE\n"); errno=ENOSYS; return -1;}
-
-int utime(const char *filename, const struct utimbuf *times) { printf("UTIME\n"); errno=ENOSYS; return -1;}
-mode_t umask(mode_t mask) { printf("UMASK\n"); errno=ENOSYS; return -1;}
-int rmdir(const char *pathname) { printf("RMDIR\n"); errno=ENOSYS; return -1;}
-int mkdir(const char *pathname, mode_t mode) { printf("MKDIR\n"); errno=ENOSYS; return -1;}
-int chdir(const char *path) { printf("CHDIR\n"); errno=ENOSYS; return -1;}
-int chmod(const char *path, mode_t mode) { printf("CHMOD\n"); errno=ENOSYS; return -1;}
-
-
-static char *cwd = "/boot";
-
-char *getcwd(char *buf, size_t size) {
-    if (!buf) {  
-        errno = EINVAL;
-        return NULL;
-    }
-    
-    if (size<strlen(cwd)+1) {
-        errno = ERANGE;
-        return NULL;
-    }
-    strcpy(buf, cwd);
-    return buf;
-
-
-}
-
-
-// Group / user ids: only one user: 0
-uid_t getuid(void) { return 0; }
-uid_t geteuid(void) { return 0; }
-gid_t getgid(void) { return 0; }
-gid_t getegid(void) { return 0; }
-
-char *ttyname(int fd) {  return NULL; }
-
-
 
 DIR *opendir(const char *pathname) {
     DIR *ret = NULL;
     handler_t handler;
-    int error=-1;
+    int error;
     const char *fspathname;    
     handler = handler_for_path(pathname, &fspathname);
     
-    printf("OPENDIR %s handler = %d = %s\n", pathname, handler, fspathname);
+    //printf("OPENDIR %s handler = %d = %s\n", pathname, handler, fspathname);
     
     if (handler == HANDLER_NONE) {
         errno = ENOENT;    
@@ -427,10 +397,15 @@ DIR *opendir(const char *pathname) {
             }
             break;
         case HANDLER_INITFS:
-            error = PiPyOS_initfs_opendir(pathname, ret);
+            error = PiPyOS_initfs_opendir(fspathname, ret);
+            break;
+        case HANDLER_ROOT:
+            error = 0;
+            ret->rootfs_idx = 1;
             break;
         default: // Other handlers are char devices
             errno = ENOTDIR;
+            error = -1;
     }
     
     if (error) {
@@ -485,7 +460,17 @@ struct dirent *readdir(DIR *dirp) {
                 ret = &dirp->dirent;
             }
             break;
-        default:
+        case HANDLER_ROOT:
+            if ((dirp->rootfs_idx < HANDLER_CNT) && (PiPyOS_filehandler_names[dirp->rootfs_idx])) {
+                strcpy(dirp->dirent.d_name, PiPyOS_filehandler_names[dirp->rootfs_idx]);
+                dirp->dirent.d_ino = dirp->rootfs_idx;
+                ret = &dirp->dirent;
+                dirp->rootfs_idx++;
+            } else {
+                ret = NULL;
+            }
+            break;
+        default: // Should not happen
             errno = ENOTDIR;
             ret = NULL;
     }
@@ -505,23 +490,90 @@ int closedir(DIR *dirp) {
 }
 
 
+int _isatty(int fd) { 
+    int handler = openfiles[fd].handler;
+    return (handler == HANDLER_SERIAL) || (handler == HANDLER_FRAMEBUFFER);
+}
 
-int dup(int fd) { 
-//    printf("DUP\n");
-    // TODO: implement real functionality if required
-    // Core Python uses it only to check if fd is valid (stdin closed etc)
-    return fd;
+int _stat(const char *pathname, struct stat *buf) {
+
+    handler_t handler;
+    const char *fspathname;   
+    handler = handler_for_path(pathname, &fspathname);
     
+    //printf("STAT %s handler = %d - %s\n", pathname, handler, fspathname);
+    if (!handler) {
+        errno = ENOENT;
+        return -1;
+    }
+    
+    switch (handler) {
+        case HANDLER_INITFS:
+            return PiPyOS_initfs_stat(fspathname, buf);
+        default:
+            errno = ENOENT;
+            return -1;
+    }
+
+}
+
+int lstat(const char *path, struct stat *buf) {
+    return stat(path, buf); // Links are not supported; lstat = stat
 }
 
 
-void sig_ign(int code) {
-    (void) code;
-    chprintf((BaseSequentialStream *)&SD1, "SIGIGN\r\n");
+int fcntl(int fd, int cmd, ...) {
+    return 0; // fcntl is used by several functions in Python fileutils.c
 }
 
-void sig_err(int code) {
-    (void) code;
-    chprintf((BaseSequentialStream *)&SD1, "SIGERR\r\n");
+/* Core Python uses dup to check if an fd is valid.
+ */
+int dup(int fd) {
+    if (!openfiles[fd].handler) {
+        errno = EBADF;
+        return -1;
+    }
+
+    for(int i=0;i<MAX_OPEN_FILES;i++) {
+        if (!openfiles[i].handler) {
+            memcpy(&openfiles[i], &openfiles[fd], sizeof(openfiles[0]));
+            return i;
+        }
+    }
+    
+    errno = EMFILE;
+    return -1;
 
 }
+
+
+/*  
+ *  Stubs; functionality could be implemented once required
+ */
+
+// Group / user ids: only one user: 0
+uid_t getuid(void) { return 0; }
+uid_t geteuid(void) { return 0; }
+gid_t getgid(void) { return 0; }
+gid_t getegid(void) { return 0; }
+
+char *ttyname(int fd) {  return NULL; }
+void sig_ign(int code) { }
+void sig_err(int code) { }
+int _unlink(const char *pathname)                   { errno=ENOSYS; return -1; }
+int _execve(const char *filename, 
+    char *const argv[], char *const envp[])         { errno=ENOSYS; return -1; }
+int execv(const char *path, char *const argv[])     { errno=ENOSYS; return -1; }
+pid_t _fork(void)                                   { errno=ENOSYS; return -1; }
+pid_t _wait(int *status)                            { errno=ENOSYS; return -1; }
+int _link(const char *oldpath, const char *newpath) { errno=ENOSYS; return -1;}
+int pipe(int pipefd[2])                             { errno=ENOSYS; return -1;}
+int utime(const char *filename, 
+    const struct utimbuf *times)                    { errno=ENOSYS; return -1;}
+mode_t umask(mode_t mask)                           { errno=ENOSYS; return -1;}
+int rmdir(const char *pathname)                     { errno=ENOSYS; return -1;}
+int mkdir(const char *pathname, mode_t mode)        { errno=ENOSYS; return -1;}
+int chdir(const char *path)                         { errno=ENOSYS; return -1;}
+int chmod(const char *path, mode_t mode)            { errno=ENOSYS; return -1;}
+int _lseek(int fd, int offset, int whence)          { errno=ENOSYS; return -1;}
+

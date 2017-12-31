@@ -39,8 +39,3 @@ DRESULT disk_ioctl (BYTE pdrv, BYTE cmd, void* buff) {
     return RES_ERROR;
 
 }
-
-DWORD get_fattime (void) {
-    unsigned int year=2017, day=1, month=1;
-    return ((year - 1980) << 25) | (month << 21) | (day << 16);
-}

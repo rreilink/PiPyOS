@@ -29,6 +29,8 @@ extern PyObject* PyInit__codecs(void);
 extern PyObject* PyInit_errno(void);
 extern PyObject* PyInit__struct(void);
 extern PyObject* PyInit_math(void);
+extern PyObject* PyInit_itertools(void);
+extern PyObject* PyInit_time(void);
 extern PyObject* PyInit__rpi(void);
 extern PyObject* PyInit_app(void);
 
@@ -51,6 +53,8 @@ struct _inittab _PyImport_Inittab[] = {
 {"errno", PyInit_errno},
 {"_struct", PyInit__struct},
 {"math", PyInit_math},
+{"itertools", PyInit_itertools},
+{"time", PyInit_time},
 {"_rpi", PyInit__rpi},
 {"app", PyInit_app},
 /* -- ADDMODULE MARKER 2 -- */

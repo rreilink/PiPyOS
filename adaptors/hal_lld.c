@@ -100,11 +100,11 @@ CH_IRQ_HANDLER(IrqHandler)
   mini_uart_sendhex(mode, 1);
   for(;;);
 */
-  uint32_t pend1, pend2;
+  uint32_t pend1;//, pend2;
 
   do {
     pend1 = IRQ_PEND1;
-    pend2 = IRQ_PEND2;
+//    pend2 = IRQ_PEND2;
     
 #if HAL_USE_SERIAL
     if (pend1 & BIT(29)) {
@@ -112,14 +112,14 @@ CH_IRQ_HANDLER(IrqHandler)
       continue;
     }
 #endif
-
+/*
 #if HAL_USE_SPI
     if (pend2 & BIT(22)) { // Bit 54
         spi_lld_serve_interrupt(&SPI0);
         continue;
     }
 #endif
-
+*/
     if (pend1 & BIT(1)) {
       systimer_serve_interrupt();
       continue;

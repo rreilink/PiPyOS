@@ -12,6 +12,7 @@ env_base = Environment(
     # '-march=armv7-a -mtune=cortex-a7 '
     '-mcpu=arm1176jz-s -mfloat-abi=soft -mno-thumb-interwork '
     '-Wall -ffunction-sections -fdata-sections -g '
+    '-D_XOPEN_SOURCE=600 '
     '-O2'.split()
 
     ,
@@ -82,7 +83,7 @@ env_py=env_base.Clone(
     CPPPATH=['.', 'adaptors', 'deps/cpython/Include'],
     )
 
-env_py.Append(CCFLAGS=['-std=c99', '-DPy_BUILD_CORE', '-Wno-unused-function', '-Wno-unused-variable', '-Wno-unused-parameter'])
+env_py.Append(CCFLAGS=['-std=gnu99', '-DPy_BUILD_CORE', '-Wno-unused-function', '-Wno-unused-variable', '-Wno-unused-parameter'])
 
 
 python = env_py.Object(
@@ -103,7 +104,8 @@ python = env_py.Object(
      'deps/cpython/Modules/posixmodule.c', 'deps/cpython/Modules/zipimport.c',
      'deps/cpython/Modules/_codecsmodule.c', 'deps/cpython/Modules/errnomodule.c',
      'deps/cpython/Modules/_struct.c', 'deps/cpython/Modules/mathmodule.c',
-     'deps/cpython/Modules/_math.c',
+     'deps/cpython/Modules/_math.c', 'deps/cpython/Modules/timemodule.c',
+     'deps/cpython/Modules/itertoolsmodule.c',
      'config.c',
      ]
     ,

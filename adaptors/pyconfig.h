@@ -123,7 +123,7 @@
 #undef HAVE_CHROOT
 
 /* Define to 1 if you have the `clock' function. */
-#undef HAVE_CLOCK
+#define HAVE_CLOCK
 
 /* Define to 1 if you have the `clock_getres' function. */
 #define HAVE_CLOCK_GETRES 1
@@ -810,6 +810,7 @@
 
 /* Define to 1 if you have the `select' function. */
 #undef HAVE_SELECT
+//#define HAVE_SELECT 1
 
 /* Define to 1 if you have the `sem_getvalue' function. */
 #undef HAVE_SEM_GETVALUE
@@ -1070,7 +1071,7 @@
 #undef HAVE_SYS_RESOURCE_H
 
 /* Define to 1 if you have the <sys/select.h> header file. */
-#undef HAVE_SYS_SELECT_H
+#define HAVE_SYS_SELECT_H 1
 
 /* Define to 1 if you have the <sys/sendfile.h> header file. */
 #undef HAVE_SYS_SENDFILE_H
@@ -1097,13 +1098,13 @@
 #undef HAVE_SYS_TERMIO_H
 
 /* Define to 1 if you have the <sys/times.h> header file. */
-#undef HAVE_SYS_TIMES_H
+#define HAVE_SYS_TIMES_H 1
 
 /* Define to 1 if you have the <sys/time.h> header file. */
-#undef HAVE_SYS_TIME_H
+#define HAVE_SYS_TIME_H 1
 
 /* Define to 1 if you have the <sys/types.h> header file. */
-#undef HAVE_SYS_TYPES_H
+#define HAVE_SYS_TYPES_H 1
 
 /* Define to 1 if you have the <sys/uio.h> header file. */
 #undef HAVE_SYS_UIO_H

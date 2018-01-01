@@ -3,6 +3,8 @@
 #include "chprintf.h"
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/times.h>
 #include "dirent_os.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,6 +12,9 @@
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <stdarg.h>
+#include "bcm2835.h" // for clock_gettime
+#include "bcmframebuffer.h"
 
 #define DIR DIR_FF // ff.h defines the type DIR, but that is reserved for dirent.h. So define it to be DIR_FF
 #include "ff.h"
@@ -17,28 +22,87 @@
 
 #include "initfs.h"
 
+#if 0
+
+static int PiPyOS_bcm_framebuffer_printf(const char *format, ...) {
+    char msg[256];
+    int ret;
+    va_list ap;
+    va_start(ap, format);
+    ret = vsnprintf(msg, sizeof(msg)-1, format, ap);
+    va_end(ap);
+    PiPyOS_bcm_framebuffer_putstring(msg, -1);
+    return ret;
+}
+
+#define TRACE_ENTRY(format, function, ...) PiPyOS_bcm_framebuffer_printf(format "\n", function, __VA_ARGS__)
+#define TRACE_EXIT(format, function, ...) PiPyOS_bcm_framebuffer_printf(format "\n", function, __VA_ARGS__)
+
+#else
+
+#define TRACE_ENTRY(format, function, ...)
+#define TRACE_EXIT(format, function, ...)
+
+#endif
+
+
 int clock_getres(clockid_t clk_id, struct timespec *res) { 
     res->tv_sec=0;
-    res->tv_nsec=1000000; // 1ms; TODO: get from ChibiOS timer config
+    res->tv_nsec=1000; // 1us resolution of SYSTIMER
     
     return 0; 
 
 }
-int clock_gettime(clockid_t clk_id, struct timespec *tp) { 
-    systime_t ticks; 
-    ldiv_t q;
 
-    // Get ChibiOS ticks counter, split to whole and fractional seconds
-    
-    ticks = chTimeNow(); // TODO: handle overflow
-    q = ldiv(ticks, 1000);
+int clock_gettime(clockid_t clk_id, struct timespec *tp) { 
+    unsigned long low, high, high2;
+    unsigned long long microseconds;
+
+    lldiv_t q;
+
+    // Read high and low 32-bit timer registers; ensure no low roll-over in between
+    do {
+        high = SYSTIMER_CHI;
+        low = SYSTIMER_CLO;
+        high2 = SYSTIMER_CHI;
+    } while (high!=high2);
+        
+    microseconds = (((unsigned long long) high)<<32) | low;
+
+    q = lldiv(microseconds, 1000000);
     
     tp->tv_sec = q.quot;
-    tp->tv_nsec = q.rem * 1000000;
+    tp->tv_nsec = q.rem * 1000; // convert us to ns
 
     return 0;
     
 }
+
+int _gettimeofday(struct timeval *tv, struct timezone *tz) {
+    return 0; //1970
+}
+
+/* Only implement thread sleep, no fs's supported */
+
+int select(int nfds, fd_set *readfds, fd_set *writefds,
+                  fd_set *exceptfds, struct timeval *timeout) {
+    unsigned long milliseconds;
+ 
+    if (nfds!=0) {
+        errno = ENOSYS;
+        return -1;
+    }
+    
+    milliseconds = (timeout->tv_usec / 1000) + (timeout->tv_sec * 1000);
+    chThdSleepMilliseconds(milliseconds);
+    return 0;
+}
+
+clock_t _times(struct tms *buf) {
+    errno = ENOSYS;
+    return -1;
+}
+
 
 void _exit(int status) { 
     printf("EXIT %d\n", status); 
@@ -84,10 +148,6 @@ int _fstat(int fd, void *buf) {
     errno=ENOSYS;
     return -1;
 }
-
-
-
-
 
 
 typedef enum {
@@ -242,11 +302,13 @@ int _open(const char *pathname, int flags ) {
     const char *fspathname;
     handler_t handler;
     
-    handler = handler_for_path(pathname, &fspathname);
-    //TODO: check flags
+    TRACE_ENTRY("%s(%s, %d)", "open", pathname, flags);
     
-    //printf("OPEN %s handler = %d = %s\n", pathname, handler, fspathname);
-
+    handler = handler_for_path(pathname, &fspathname);
+    
+    
+    //TODO: check flags
+ 
     if (!handler) {
         errno = ENOENT;
         return -1;
@@ -296,80 +358,101 @@ int _open(const char *pathname, int flags ) {
     }
     
     if (!error) {
-        //printf("OPEN %s = %d\n", pathname, fd);
         openfiles[fd].handler = handler;
-        return fd;
+    } else fd = -1;
 
-    }
+    TRACE_EXIT("%s returned %d", "open", fd);
 
-    return -1;
+    return fd;
 }
 
 
 
 
 int _close(int fd) {
-    int error=0;
+    int error;
+    TRACE_ENTRY("%s(%s)", "close", fd);
+    
     if (fd<=2) { // Do not allow to close stdio
         error = EPERM;
         return -1;
+    } else {    
+        switch(openfiles[fd].handler) {
+            case HANDLER_FAT:
+                error = ff_result_to_errno(f_close(&openfiles[fd].ff_fil));
+                break;
+            default:
+                error = 0;
+        }
+        openfiles[fd].handler=0;//Mark as closed even if there were errors
     }
     
-    switch(openfiles[fd].handler) {
-        case HANDLER_FAT:
-            error = ff_result_to_errno(f_close(&openfiles[fd].ff_fil));
-            break;
-        default:
-            ;
-    }
-    openfiles[fd].handler=0;//Mark as closed even if there were errors
+    TRACE_EXIT("%s returned %d", "close", fd);
+
     return error; 
 }
 
 
-// TODO: this definition somewhere else
-extern void PiPyOS_bcm_framebuffer_putstring(const char*, int);
-
 ssize_t _write(int fd, const void *buf, size_t count) {
+    ssize_t ret;
+
+    TRACE_ENTRY("%s(%d,<buffer>,%d)", "write", fd, count);
+
     switch(openfiles[fd].handler) {
         case HANDLER_FRAMEBUFFER:
             PiPyOS_bcm_framebuffer_putstring((const char *)buf, count);
-            return count;
+            ret = count;
+            break;
         case HANDLER_SERIAL:
             chSequentialStreamWrite(openfiles[fd].serialstream, buf, count);
-            return count;
+            ret = count;
+            break;
         default:
             errno = EBADF; // no write to all other file handlers including HANDLER_NONE (closed file)
-            return -1;
+            ret = -1;
     }
+    
+    TRACE_EXIT("%s returned %d", "write", ret);
+    return ret;
 }
 
 
 ssize_t _read(int fd, void *buf, size_t count) { 
     int error;
+    int ret;
     unsigned int bytesread;
+    
+    TRACE_ENTRY("%s(%d,<buffer>,%d)", "read", fd, count);
 
     switch(openfiles[fd].handler) {
         case HANDLER_NONE:
             errno = EBADF;
-            return -1;
+            ret = -1;
+            break;
         case HANDLER_FAT:
             error = f_read(&openfiles[fd].ff_fil, buf, count, &bytesread);
             if (error) {
-                return ff_result_to_errno(error);
+                ret = ff_result_to_errno(error);
             } else {
-                return bytesread;
+                ret = bytesread;
             }
+            break;
         case HANDLER_INITFS:
-            return PiPyOS_initfs_read(&openfiles[fd].initfs, buf, count);
+            ret = PiPyOS_initfs_read(&openfiles[fd].initfs, buf, count);
+            break;
         case HANDLER_SERIAL:
             if (count ==0) return 0;
             while(chSequentialStreamRead(openfiles[fd].serialstream, buf, 1)==0);
-            return 1;
+            ret = 1;
+            break;
         default:
             errno = EBADF; // no read from all other file handlers including HANDLER_NONE (closed file)
-            return -1;
+            ret = -1;
     }
+    
+    TRACE_EXIT("%s returned %d", "read", ret);
+
+    return ret;
 
 }
 
@@ -474,6 +557,9 @@ struct dirent *readdir(DIR *dirp) {
             errno = ENOTDIR;
             ret = NULL;
     }
+    
+    TRACE_EXIT("%s returned %d", "stat", ret);
+    
     return ret;
     
 }
@@ -498,12 +584,14 @@ int _isatty(int fd) {
 int _stat(const char *pathname, struct stat *buf) {
 
     handler_t handler;
-    const char *fspathname;   
-    handler = handler_for_path(pathname, &fspathname);
+    const char *fspathname;
     int error;
     FILINFO info;    
-    
-    printf("STAT %s handler = %d - %s\n", pathname, handler, fspathname);
+
+    TRACE_ENTRY("%s(%s, <buffer>)", "stat", pathname);
+
+    handler = handler_for_path(pathname, &fspathname);
+
     if (!handler) {
         errno = ENOENT;
         return -1;

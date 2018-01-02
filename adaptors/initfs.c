@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include "initfs.h"
 
 typedef struct {
@@ -165,4 +166,37 @@ found:
 
 
     return 0;
+}
+
+int PiPyOS_initfs_lseek(initfs_openfile_t *file, int offset, int whence) {
+    int ret = 0;
+    int base;
+    
+    switch (whence) {
+        case SEEK_SET: 
+            base = 0;
+            break;
+        case SEEK_CUR:
+            base = file->pos;
+            break;
+        case SEEK_END:
+            base = file->size;
+            break;                    
+        default:
+            errno = EINVAL;
+            ret = -1;
+    }
+
+    if (ret == 0) { // no error so far
+        offset = offset + base;
+        if ((offset >= 0) && (offset < file->size)) {
+            file->pos = offset;
+            ret = offset;
+        } else {
+            errno = EINVAL;
+            ret = -1;
+        }
+    }
+
+    return ret;
 }

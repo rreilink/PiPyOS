@@ -28,7 +28,7 @@ env_base = Environment(
     ASFLAGS="-c -x assembler-with-cpp $CCFLAGS",
     
     ASCOMSTR = "Assembling $TARGET",
-    CCCOMSTR = "Compiling $TARGET",
+    #CCCOMSTR = "Compiling $TARGET",
     LINKCOMSTR = "Linking $TARGET",
     
     
@@ -105,7 +105,7 @@ python = env_py.Object(
      'deps/cpython/Modules/_codecsmodule.c', 'deps/cpython/Modules/errnomodule.c',
      'deps/cpython/Modules/_struct.c', 'deps/cpython/Modules/mathmodule.c',
      'deps/cpython/Modules/_math.c', 'deps/cpython/Modules/timemodule.c',
-     'deps/cpython/Modules/itertoolsmodule.c',
+     'deps/cpython/Modules/itertoolsmodule.c', 'deps/cpython/Modules/_functoolsmodule.c',
      'config.c',
      ]
     ,

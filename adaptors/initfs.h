@@ -16,5 +16,6 @@ int PiPyOS_initfs_read(initfs_openfile_t *file, void *buf, size_t count);
 int PiPyOS_initfs_opendir(const char *pathname, DIR *dir);
 int PiPyOS_initfs_readdir(DIR *dirp);
 int PiPyOS_initfs_stat(const char *pathname, struct stat *buf);
+int PiPyOS_initfs_lseek(initfs_openfile_t *file, int offset, int whence);
 
 #endif

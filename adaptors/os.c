@@ -24,24 +24,31 @@
 
 #if 0
 
-static int PiPyOS_bcm_framebuffer_printf(const char *format, ...) {
+char *PiPyOS_trace_filter=" open stat readdir opendir read lseek ";
+
+static void PiPyOS_trace(const char *format, char* function, ...) {
     char msg[256];
-    int ret;
     va_list ap;
-    va_start(ap, format);
-    ret = vsnprintf(msg, sizeof(msg)-1, format, ap);
+    
+    if (!strstr(PiPyOS_trace_filter, function)) return;
+    
+    va_start(ap, function);
+    vsnprintf(msg, sizeof(msg)-1, format, ap);
     va_end(ap);
-    PiPyOS_bcm_framebuffer_putstring(msg, -1);
-    return ret;
+    
+    
+    chSequentialStreamWrite((BaseSequentialStream *)&SD1, (uint8_t*)msg, strlen(msg));
+    //PiPyOS_bcm_framebuffer_putstring(msg, -1);
+
 }
 
-#define TRACE_ENTRY(format, function, ...) PiPyOS_bcm_framebuffer_printf(format "\n", function, __VA_ARGS__)
-#define TRACE_EXIT(format, function, ...) PiPyOS_bcm_framebuffer_printf(format "\n", function, __VA_ARGS__)
+#define TRACE_ENTRY(format, function, ...) PiPyOS_trace("%s (" format ")\n", " " function " ", function, ##__VA_ARGS__)
+#define TRACE_EXIT(format, function, ...) PiPyOS_trace("%s returned " format "\n", " " function " ", function, ##__VA_ARGS__)
 
 #else
 
-#define TRACE_ENTRY(format, function, ...)
-#define TRACE_EXIT(format, function, ...)
+#define TRACE_ENTRY(format, function, ...) do { } while(0)
+#define TRACE_EXIT(format, function, ...) do { } while(0)
 
 #endif
 
@@ -140,11 +147,9 @@ int getppid(void) {
     return 0;
 }
 
-//TODO general: set errno upon error
 
 int _fstat(int fd, void *buf) {
-    //called before printf can be used, so use chprintf
-//    chprintf((BaseSequentialStream *)&SD1, "FSTAT\n");
+    // TODO: implement?
     errno=ENOSYS;
     return -1;
 }
@@ -302,7 +307,7 @@ int _open(const char *pathname, int flags ) {
     const char *fspathname;
     handler_t handler;
     
-    TRACE_ENTRY("%s(%s, %d)", "open", pathname, flags);
+    TRACE_ENTRY("%s, %d", "open", pathname, flags);
     
     handler = handler_for_path(pathname, &fspathname);
     
@@ -361,7 +366,7 @@ int _open(const char *pathname, int flags ) {
         openfiles[fd].handler = handler;
     } else fd = -1;
 
-    TRACE_EXIT("%s returned %d", "open", fd);
+    TRACE_EXIT("%d", "open", fd);
 
     return fd;
 }
@@ -371,7 +376,7 @@ int _open(const char *pathname, int flags ) {
 
 int _close(int fd) {
     int error;
-    TRACE_ENTRY("%s(%s)", "close", fd);
+    TRACE_ENTRY("%s", "close", fd);
     
     if (fd<=2) { // Do not allow to close stdio
         error = EPERM;
@@ -387,7 +392,7 @@ int _close(int fd) {
         openfiles[fd].handler=0;//Mark as closed even if there were errors
     }
     
-    TRACE_EXIT("%s returned %d", "close", fd);
+    TRACE_EXIT("%d", "close", fd);
 
     return error; 
 }
@@ -396,7 +401,7 @@ int _close(int fd) {
 ssize_t _write(int fd, const void *buf, size_t count) {
     ssize_t ret;
 
-    TRACE_ENTRY("%s(%d,<buffer>,%d)", "write", fd, count);
+    TRACE_ENTRY("%d,<buffer>,%d", "write", fd, count);
 
     switch(openfiles[fd].handler) {
         case HANDLER_FRAMEBUFFER:
@@ -412,7 +417,7 @@ ssize_t _write(int fd, const void *buf, size_t count) {
             ret = -1;
     }
     
-    TRACE_EXIT("%s returned %d", "write", ret);
+    TRACE_EXIT("%d", "write", ret);
     return ret;
 }
 
@@ -422,13 +427,9 @@ ssize_t _read(int fd, void *buf, size_t count) {
     int ret;
     unsigned int bytesread;
     
-    TRACE_ENTRY("%s(%d,<buffer>,%d)", "read", fd, count);
-
+    if (fd>0) TRACE_ENTRY("%d,<buffer>,%d", "read", fd, count);
+    
     switch(openfiles[fd].handler) {
-        case HANDLER_NONE:
-            errno = EBADF;
-            ret = -1;
-            break;
         case HANDLER_FAT:
             error = f_read(&openfiles[fd].ff_fil, buf, count, &bytesread);
             if (error) {
@@ -450,7 +451,7 @@ ssize_t _read(int fd, void *buf, size_t count) {
             ret = -1;
     }
     
-    TRACE_EXIT("%s returned %d", "read", ret);
+    if (fd>0) TRACE_EXIT("%d", "read", ret);
 
     return ret;
 
@@ -461,43 +462,48 @@ DIR *opendir(const char *pathname) {
     handler_t handler;
     int error;
     const char *fspathname;    
+    
+    TRACE_ENTRY("%s", "opendir", pathname);
+
+    
     handler = handler_for_path(pathname, &fspathname);
     
-    //printf("OPENDIR %s handler = %d = %s\n", pathname, handler, fspathname);
-    
-    if (handler == HANDLER_NONE) {
+     if (handler == HANDLER_NONE) {
         errno = ENOENT;    
-        return NULL;
-    }
-    
-    ret = malloc(sizeof(DIR));
-    
-    switch(handler) {
-        case HANDLER_FAT:
-            error = f_opendir(&ret->ff_dir, fspathname);
-            if (error) {
-                ff_result_to_errno(error);
-            }
-            break;
-        case HANDLER_INITFS:
-            error = PiPyOS_initfs_opendir(fspathname, ret);
-            break;
-        case HANDLER_ROOT:
-            error = 0;
-            ret->rootfs_idx = 1;
-            break;
-        default: // Other handlers are char devices
-            errno = ENOTDIR;
-            error = -1;
-    }
-    
-    if (error) {
-        free(ret);
         ret = NULL;
     } else {
-        // Store handler so readdir can call the appropriate xxx_readdir
-        ret->handler = handler;
-    }    
+    
+        ret = malloc(sizeof(DIR));
+        
+        switch(handler) {
+            case HANDLER_FAT:
+                error = f_opendir(&ret->ff_dir, fspathname);
+                if (error) {
+                    ff_result_to_errno(error);
+                }
+                break;
+            case HANDLER_INITFS:
+                error = PiPyOS_initfs_opendir(fspathname, ret);
+                break;
+            case HANDLER_ROOT:
+                error = 0;
+                ret->rootfs_idx = 1;
+                break;
+            default: // Other handlers are char devices
+                errno = ENOTDIR;
+                error = -1;
+        }
+        
+        if (error) {
+            free(ret);
+            ret = NULL;
+        } else {
+            // Store handler so readdir can call the appropriate xxx_readdir
+            ret->handler = handler;
+        }    
+    }
+    
+    TRACE_EXIT("%s", "opendir", ret ? "<dir>" : "NULL");
     
     return ret;
 }
@@ -514,6 +520,8 @@ struct dirent *readdir(DIR *dirp) {
     FILINFO info;
     int error;
     struct dirent *ret; // Do NOT set value here, to make sure all code paths are covered
+
+    TRACE_ENTRY("<dir>", "readdir");
 
     switch(dirp->handler) {
         case HANDLER_FAT:
@@ -558,14 +566,16 @@ struct dirent *readdir(DIR *dirp) {
             ret = NULL;
     }
     
-    TRACE_EXIT("%s returned %d", "stat", ret);
-    
+    TRACE_EXIT("%s", "readdir", ret ? ret->d_name : "NULL");
+
     return ret;
     
 }
 
 
 int closedir(DIR *dirp) {
+    TRACE_ENTRY("<dir>", "closedir");
+
     switch(dirp->handler) {
         case HANDLER_FAT:
             f_closedir(&dirp->ff_dir);
@@ -588,14 +598,9 @@ int _stat(const char *pathname, struct stat *buf) {
     int error;
     FILINFO info;    
 
-    TRACE_ENTRY("%s(%s, <buffer>)", "stat", pathname);
+    TRACE_ENTRY("%s, <buffer>", "stat", pathname);
 
     handler = handler_for_path(pathname, &fspathname);
-
-    if (!handler) {
-        errno = ENOENT;
-        return -1;
-    }
     
     switch (handler) {
         case HANDLER_FAT:
@@ -628,9 +633,69 @@ int _stat(const char *pathname, struct stat *buf) {
     }
     
     if (!error) buf->st_dev = handler;
+    
+    TRACE_EXIT("%d", "stat", error);
+
     return error;
 
 }
+
+int _lseek(int fd, int offset, int whence) {
+    int ret;
+    int error;
+    int base;
+
+    TRACE_ENTRY("%d, %d, %d", "lseek", fd, offset, whence);
+
+    switch(openfiles[fd].handler) {
+        case HANDLER_FAT:
+            ret = 0;
+            switch (whence) {
+                case SEEK_SET: 
+                    base = 0;
+                    break;
+                case SEEK_CUR:
+                    base = f_tell(&openfiles[fd].ff_fil);
+                    break;
+                case SEEK_END:
+                    base = f_size(&openfiles[fd].ff_fil);
+                    break;                    
+                default:
+                    errno = EINVAL;
+                    ret = -1;
+            }
+
+            if (ret == 0) { // no error so far
+                offset = offset + base;
+                if (offset < 0) {
+                    errno = EINVAL;
+                    ret = -1;
+                }
+            }
+            
+            if (ret == 0) { // no error so far
+            
+                error = f_lseek(&openfiles[fd].ff_fil, offset);
+                if (error) {
+                    ret = ff_result_to_errno(error);
+                } else {
+                    ret = offset;
+                }
+            }
+            break;
+        case HANDLER_INITFS:
+            ret = PiPyOS_initfs_lseek(&openfiles[fd].initfs, offset, whence);
+            break;
+        default:
+            errno = EBADF; // no lseek in all other file handlers including HANDLER_NONE (closed file)
+            ret = -1;
+    }
+        
+    TRACE_EXIT("%d", "lseek", ret);   
+    return ret; 
+}
+
+
 
 int lstat(const char *path, struct stat *buf) {
     return stat(path, buf); // Links are not supported; lstat = stat
@@ -690,5 +755,4 @@ int rmdir(const char *pathname)                     { errno=ENOSYS; return -1;}
 int mkdir(const char *pathname, mode_t mode)        { errno=ENOSYS; return -1;}
 int chdir(const char *path)                         { errno=ENOSYS; return -1;}
 int chmod(const char *path, mode_t mode)            { errno=ENOSYS; return -1;}
-int _lseek(int fd, int offset, int whence)          { errno=ENOSYS; return -1;}
 

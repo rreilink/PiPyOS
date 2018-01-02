@@ -34,7 +34,9 @@ static msg_t Thread1(void *p) {
   return 0;
 }
 
-static wchar_t *argv[] = { L"python", L"-B", L"-i", L"-c", L"import _rpi as r, app as a" };
+//static wchar_t *argv[] = { L"python", L"-S", L"-B", L"-i", L"-c", L"import _rpi as r, app as a, zipimport; zipimport.zipimporter('/sd/python36.zip')" };
+
+static wchar_t *argv[] = { L"python", L"-B", L"-i", L"-c", L"print('hello!')" };
 extern const char *Py_FileSystemDefaultEncoding;
 
 
@@ -42,7 +44,7 @@ extern const char *Py_FileSystemDefaultEncoding;
 
 int Py_Main(int argc, wchar_t **argv);
 void PiPyOS_initreadline(void);
-
+void Py_SetPath(const wchar_t *);
 
 
 static WORKING_AREA(waPythonThread, 1048576);
@@ -56,7 +58,7 @@ static msg_t PythonThread(void *p) {
   setenv("HOME", "/", 1); // prevent import of pwdmodule in posixpath.expanduser
 
   Py_FileSystemDefaultEncoding = "latin-1";
-
+  Py_SetPath(L"/boot:/sd/python36.zip");
   
   printf("GOGOGO!\n");
   

@@ -101,6 +101,7 @@ def main(target=None, source=None, env=None):
         'encodings/aliases.py',
         'encodings/utf_8.py',
         'encodings/latin_1.py',
+        'encodings/cp437.py',
         'io.py',
         'abc.py',
         '_weakrefset.py',
@@ -112,7 +113,8 @@ def main(target=None, source=None, env=None):
         '_collections_abc.py',
         'struct.py',
         'codecs.py']:
-            fs.addfile('deps/cpython/Lib/' + file, '/' + file)
+            pass # Only use if reading from zip file is not working
+            # fs.addfile('deps/cpython/Lib/' + file, '/' + file)
     
     # 
     fs.addfile('lib/posixpath.py','/posixpath.py') 

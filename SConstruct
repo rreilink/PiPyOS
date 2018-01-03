@@ -106,6 +106,7 @@ python = env_py.Object(
      'deps/cpython/Modules/_struct.c', 'deps/cpython/Modules/mathmodule.c',
      'deps/cpython/Modules/_math.c', 'deps/cpython/Modules/timemodule.c',
      'deps/cpython/Modules/itertoolsmodule.c', 'deps/cpython/Modules/_functoolsmodule.c',
+     'deps/cpython/Modules/atexitmodule.c', 
      'config.c',
      ]
     ,

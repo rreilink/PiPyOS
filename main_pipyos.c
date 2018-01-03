@@ -36,7 +36,7 @@ static msg_t Thread1(void *p) {
 
 //static wchar_t *argv[] = { L"python", L"-S", L"-B", L"-i", L"-c", L"import _rpi as r, app as a, zipimport; zipimport.zipimporter('/sd/python36.zip')" };
 
-static wchar_t *argv[] = { L"python", L"-B", L"-i", L"-c", L"print('hello!')" };
+static wchar_t *argv[] = { L"python", L"-B", L"-i", L"/boot/app/gcode.py" };
 extern const char *Py_FileSystemDefaultEncoding;
 
 
@@ -78,7 +78,7 @@ static msg_t PythonThread(void *p) {
   
   PiPyOS_initreadline();
   
-  Py_Main(5, argv);
+  Py_Main(3, argv);
   
   
   //sdcConnect(&SDCD1);

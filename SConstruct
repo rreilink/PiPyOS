@@ -6,7 +6,7 @@ def skip(files, toskip):
     return [f for f in files if not f.name in toskip]
 
 env_base = Environment(
-    CC='/opt/local/bin/arm-none-eabi-gcc',  
+    CC='arm-none-eabi-gcc',  
     CCFLAGS=
     # '-mfloat-abi=soft -Wno-psabi '
     # '-march=armv7-a -mtune=cortex-a7 '
@@ -149,5 +149,5 @@ pipyos = env_chibios.Program('pipyos.elf', [
     )
 
 
-Command('pipyos.img', 'pipyos.elf', '/opt/local/bin/arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
+Command('pipyos.img', 'pipyos.elf', 'arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
 

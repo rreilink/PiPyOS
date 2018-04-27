@@ -150,5 +150,5 @@ pipyos = env_chibios.Program('pipyos.elf', [
     )
 
 
-Command('pipyos.img', 'pipyos.elf', '/opt/local/bin/arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
+Command('pipyos.img', 'pipyos.elf', 'arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
 

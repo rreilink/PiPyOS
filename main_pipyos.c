@@ -155,7 +155,7 @@ void FiqHandlerInit(void);
  * Application entry point.
  */
 int main(void) {
-  const SerialConfig serialConfig ={921600};
+  const SerialConfig serialConfig ={1000000};
   const SDCConfig sdccfg = { 0 }; 
   
   AUX_MU_CNTL_REG = 0; // disable uart RX during setup of HAL. This prevents a random char to appear in the input buffer

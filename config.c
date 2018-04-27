@@ -33,6 +33,7 @@ extern PyObject* PyInit_itertools(void);
 extern PyObject* PyInit_time(void);
 extern PyObject* PyInit__functools(void);
 extern PyObject* PyInit_atexit(void);
+extern PyObject* PyInit_array(void);
 extern PyObject* PyInit__rpi(void);
 extern PyObject* PyInit_app(void);
 
@@ -59,8 +60,9 @@ struct _inittab _PyImport_Inittab[] = {
 {"time", PyInit_time},
 {"_functools", PyInit__functools},
 {"atexit", PyInit_atexit},
+{"array", PyInit_array},
 {"_rpi", PyInit__rpi},
-{"app", PyInit_app},
+{"_app", PyInit_app},
 /* -- ADDMODULE MARKER 2 -- */
 
     /* This module lives in marshal.c */

@@ -77,7 +77,7 @@ static void systimer_serve_interrupt( void )
 
   SYSTIMER_CS = SYSTIMER_CS_MATCH1; //write to clear bit
   
-  app_systick();
+  //app_systick();
 
 }
 
@@ -100,14 +100,13 @@ CH_IRQ_HANDLER(IrqHandler)
   mini_uart_sendhex(mode, 1);
   for(;;);
 */
-  uint32_t pend1;//, pend2;
+  uint32_t pend1, pend2;
 
   do {
     pend1 = IRQ_PEND1;
-//    pend2 = IRQ_PEND2;
-    
+    pend2 = IRQ_PEND2;  
 #if HAL_USE_SERIAL
-    if (pend1 & BIT(29)) {
+    if (pend2 & BIT(57-32)) {
       sd_lld_serve_interrupt(&SD1);
       continue;
     }
@@ -121,10 +120,10 @@ CH_IRQ_HANDLER(IrqHandler)
 #endif
 */
     if (pend1 & BIT(1)) {
+
       systimer_serve_interrupt();
       continue;
     }
-
 
 
 /*

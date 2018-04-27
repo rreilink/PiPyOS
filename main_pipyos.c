@@ -36,7 +36,7 @@ static msg_t Thread1(void *p) {
 
 //static wchar_t *argv[] = { L"python", L"-S", L"-B", L"-i", L"-c", L"import _rpi as r, app as a, zipimport; zipimport.zipimporter('/sd/python36.zip')" };
 
-static wchar_t *argv[] = { L"python", L"-B", L"-i", L"/boot/app/gcode.py" };
+static wchar_t *argv[] = { L"python", L"-S", L"-B", L"-i", L"/boot/app/gcode.py" };
 extern const char *Py_FileSystemDefaultEncoding;
 
 
@@ -46,6 +46,7 @@ int Py_Main(int argc, wchar_t **argv);
 void PiPyOS_initreadline(void);
 void Py_SetPath(const wchar_t *);
 
+void pitft_test(void);
 
 static WORKING_AREA(waPythonThread, 1048576);
 
@@ -58,30 +59,24 @@ static msg_t PythonThread(void *p) {
   setenv("HOME", "/", 1); // prevent import of pwdmodule in posixpath.expanduser
 
   Py_FileSystemDefaultEncoding = "latin-1";
-  Py_SetPath(L"/boot:/sd/python36.zip");
+  Py_SetPath(L"/boot:/boot/app:/sd/python36.zip");
   
   printf("GOGOGO!\n");
-  
   if (!sdcConnect(&SDCD1)) {
-
-    printf("OK\r\n");
-  
+    printf("OK\r\n");  
   } else {
-    printf("sdcConnect failed\r\n");
-  
+    printf("sdcConnect failed\r\n");  
   }
   
   FATFS fs;
   f_mount(&fs, "", 0);
 
   
-  
   PiPyOS_initreadline();
   
   Py_Main(3, argv);
   
-  
-  //sdcConnect(&SDCD1);
+
   
   return 0;
 }
@@ -170,12 +165,17 @@ int main(void) {
 
   app_init();
 
+  PiPyOS_bcm_framebuffer_init(0, 0);
+  PiPyOS_bcm_framebuffer_putstring("init\n", -1);
+  
   /*
    * Serial port initialization.
    */
+
+  palSetPadMode(GPIO18_PORT, GPIO18_PAD, PAL_MODE_OUTPUT);
   sdStart(&SD1, &serialConfig); 
+  
   chprintf((BaseSequentialStream *)&SD1, "Main (SD1 started)\r\n");
-  PiPyOS_bcm_framebuffer_init(0, 0);
   os_init_stdio();
   
   initcache();

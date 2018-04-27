@@ -113,7 +113,7 @@ void PiPyOS_bcm_framebuffer_init(int width, int height) {
 }
 
 
-/* count = -1: write upto \n
+/* count = -1: write upto \0
  * count >=0: write count chars
  */
 

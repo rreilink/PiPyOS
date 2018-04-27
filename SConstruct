@@ -6,7 +6,7 @@ def skip(files, toskip):
     return [f for f in files if not f.name in toskip]
 
 env_base = Environment(
-    CC='/opt/local/bin/arm-none-eabi-gcc',  
+    CC='arm-none-eabi-gcc',  
     CCFLAGS=
     # '-mfloat-abi=soft -Wno-psabi '
     # '-march=armv7-a -mtune=cortex-a7 '
@@ -64,7 +64,7 @@ chibios = env_chibios.Object(
      Glob(chibios_path + 'os/kernel/src/*.c'),
      Glob(chibios_path + 'os/hal/src/*.c'),
      Glob(chibios_path + 'test/*.c'),
-     skip(Glob(chibios_path + 'os/hal/platforms/BCM2835/*.c'),['hal_lld.c']),
+     skip(Glob(chibios_path + 'os/hal/platforms/BCM2835/*.c'),['hal_lld.c', 'serial_lld.c']),
      chibios_path + 'os/various/shell.c',
      chibios_path + 'os/various/chprintf.c',
      chibios_path + 'boards/RASPBERRYPI_MODB/board.c',
@@ -72,6 +72,7 @@ chibios = env_chibios.Object(
      'adaptors/initfs.c',
      'adaptors/hal_lld.c',
      'adaptors/ffadaptor.c',
+     'adaptors/serial_lld.c',
      skip(Glob('deps/ff13a/*.c'), ['diskio.c']),
     ])
     
@@ -106,7 +107,7 @@ python = env_py.Object(
      'deps/cpython/Modules/_struct.c', 'deps/cpython/Modules/mathmodule.c',
      'deps/cpython/Modules/_math.c', 'deps/cpython/Modules/timemodule.c',
      'deps/cpython/Modules/itertoolsmodule.c', 'deps/cpython/Modules/_functoolsmodule.c',
-     'deps/cpython/Modules/atexitmodule.c', 
+     'deps/cpython/Modules/atexitmodule.c', 'deps/cpython/Modules/arraymodule.c',
      'config.c',
      ]
     ,
@@ -143,7 +144,7 @@ pipyos = env_chibios.Program('pipyos.elf', [
     python,
     app,
     'main_pipyos.c',
-    '/opt/local/arm-none-eabi/lib/libm.a',
+    'libm.a',
     initfs,
     ]
     )

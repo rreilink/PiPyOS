@@ -89,9 +89,23 @@ void PiPyOS_initreadline(void) {
     PyOS_ReadlineFunctionPointer = PiPyOS_readline;
 }
 
-// todo: catch Ctrl+C from console, even when _read is not called
+static int interrupt_state = 0;
+
+
+static int
+checksignals_witharg(void * arg)
+{
+    return PyErr_CheckSignals();
+}
+void PiPyOS_InterruptReceived(void) {
+    interrupt_state = 1;
+    Py_AddPendingCall(checksignals_witharg, NULL);
+}
+
 int PyOS_InterruptOccurred(void) { 
-    return 0;
+    int ret = interrupt_state;
+    interrupt_state = 0;
+    return ret;
 }
 
 void PyOS_InitInterrupts(void) { }

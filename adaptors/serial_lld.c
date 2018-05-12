@@ -8,6 +8,8 @@
 #include "hal.h"
 #include "bcmmailbox.h"
 
+void PiPyOS_InterruptReceived(void);
+
 #if HAL_USE_SERIAL || defined(__DOXYGEN__)
 
 #define UART_DR         REG(0x20201000)
@@ -107,7 +109,14 @@ void sd_lld_serve_interrupt( SerialDriver *sdp ) {
   if (UART_MIS & (UART_INT_RX | UART_INT_RT)) { // RX or RX timeout interrupt
     chSysLockFromIsr();
     while(!(UART_FR & UART_FR_RXFE)) {
-      sdIncomingDataI(sdp, UART_DR & 0xFF); //TODO: check error flags
+      unsigned int data;
+      data = UART_DR;
+      if ((data & 0xf00)==0) {
+        // No errors
+        if ((data & 0xff) == 3) PiPyOS_InterruptReceived(); // catch ctrl+c
+        
+        sdIncomingDataI(sdp, data & 0xFF);
+      }
     };
     chSysUnlockFromIsr();
   }
@@ -164,17 +173,6 @@ void sd_lld_start(SerialDriver *sdp, const SerialConfig *config) {
 
   if (config == NULL)
     config = &default_config;
-
-  uint32_t tag[2];
-
-/*
-  // Get base clock rate (required to calculate clock divider)
-  tag[0] = 2; // clock: uart
-  if (PiPyOS_bcm_get_set_property_tag(0x30002, tag, 8) == 8) {
-    base_clock_rate = tag[1];
-  } else {
-    base_clock_rate = 48000000;
-  }*/
   
   base_clock_rate = 48000000;
     

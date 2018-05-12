@@ -24,11 +24,9 @@ static msg_t Thread1(void *p) {
   (void)p;
   chRegSetThreadName("blinker");
   while (TRUE) {
-    palClearPad(ONBOARD_LED_PORT, ONBOARD_LED_PAD);
-    palClearPad(GPIO18_PORT, GPIO18_PAD);
+    palClearPad(GPIO47_PORT, GPIO47_PAD);
     chThdSleepMilliseconds(100);
-    palSetPad(ONBOARD_LED_PORT, ONBOARD_LED_PAD);
-    palSetPad(GPIO18_PORT, GPIO18_PAD);
+    palSetPad(GPIO47_PORT, GPIO47_PAD);
     chThdSleepMilliseconds(900);
   }
   return 0;
@@ -172,7 +170,6 @@ int main(void) {
    * Serial port initialization.
    */
 
-  palSetPadMode(GPIO18_PORT, GPIO18_PAD, PAL_MODE_OUTPUT);
   sdStart(&SD1, &serialConfig); 
   
   chprintf((BaseSequentialStream *)&SD1, "Main (SD1 started)\r\n");
@@ -203,7 +200,6 @@ int main(void) {
    * Set mode of onboard LED
    */
   palSetPadMode(GPIO47_PORT, GPIO47_PAD, PAL_MODE_OUTPUT);
-  palSetPadMode(GPIO18_PORT, GPIO18_PAD, PAL_MODE_OUTPUT);
 
   
   /*

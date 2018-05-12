@@ -14,7 +14,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include "bcm2835.h" // for clock_gettime
-#include "bcmframebuffer.h"
+#include "pi/bcmframebuffer.h"
 
 #define DIR DIR_FF // ff.h defines the type DIR, but that is reserved for dirent.h. So define it to be DIR_FF
 #include "ff.h"

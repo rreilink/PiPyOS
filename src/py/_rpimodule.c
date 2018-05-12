@@ -1,6 +1,6 @@
 
 #include "Python.h"
-#include "bcmmailbox.h"
+#include "pi/bcmmailbox.h"
 
 /*
   Expose the RPi peripherals map to Python

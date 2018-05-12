@@ -46,7 +46,7 @@ env_chibios.Append(
     CCFLAGS=
     '-fomit-frame-pointer -Wall -Wextra -Wstrict-prototypes  -Wno-unused-parameter'.split(),
     
-    CPPPATH=['.', 'adaptors', 'deps/ff13a'] + [chibios_path + x for x in [
+    CPPPATH=['.', 'adaptors', 'src', 'deps/ff13a'] + [chibios_path + x for x in [
         '',
         'os/ports/GCC/ARM', 'os/ports/GCC/ARM/BCM2835', 'os/kernel/include', 'test',
         'os/hal/include', 'os/hal/platforms/BCM2835', 'os/various',
@@ -64,15 +64,12 @@ chibios = env_chibios.Object(
      Glob(chibios_path + 'os/kernel/src/*.c'),
      Glob(chibios_path + 'os/hal/src/*.c'),
      Glob(chibios_path + 'test/*.c'),
-     skip(Glob(chibios_path + 'os/hal/platforms/BCM2835/*.c'),['hal_lld.c', 'serial_lld.c']),
+     skip(Glob(chibios_path + 'os/hal/platforms/BCM2835/*.c'),['hal_lld.c', 'serial_lld.c', 'sdc_lld.c']),
      chibios_path + 'os/various/shell.c',
      chibios_path + 'os/various/chprintf.c',
      chibios_path + 'boards/RASPBERRYPI_MODB/board.c',
-     'adaptors/os.c',
-     'adaptors/initfs.c',
-     'adaptors/hal_lld.c',
-     'adaptors/ffadaptor.c',
-     'adaptors/serial_lld.c',
+     Glob('src/os/*.c'),
+     Glob('src/pi/*.c'),
      skip(Glob('deps/ff13a/*.c'), ['diskio.c']),
     ])
     
@@ -81,7 +78,7 @@ chibios = env_chibios.Object(
 ######################
 
 env_py=env_base.Clone(
-    CPPPATH=['.', 'adaptors', 'deps/cpython/Include', 'deps/cpython/Modules/zlib'],
+    CPPPATH=['.', 'adaptors', 'src', 'deps/cpython/Include', 'deps/cpython/Modules/zlib'],
     )
 
 env_py.Append(CCFLAGS=['-std=gnu99', '-DPy_BUILD_CORE', '-Wno-unused-function', '-Wno-unused-variable', '-Wno-unused-parameter'])
@@ -109,17 +106,12 @@ python = env_py.Object(
      'deps/cpython/Modules/itertoolsmodule.c', 'deps/cpython/Modules/_functoolsmodule.c',
      'deps/cpython/Modules/atexitmodule.c', 'deps/cpython/Modules/arraymodule.c',
      'deps/cpython/Modules/zlibmodule.c',
-     'config.c',
      ]
     ,
     skip(Glob('deps/cpython/Modules/zlib/*.c'), ['example.c', 'minigzip.c'])
     ,
     Glob('deps/cpython/Modules/_io/*.c')
     ,
-    'adaptors/adaptor.c',
-    'adaptors/bcmmailbox.c',
-    'adaptors/bcmframebuffer.c',
-    'adaptors/_rpimodule.c',
     Glob('src/py/*.c'),
     Glob('app/*.c'),
     ]

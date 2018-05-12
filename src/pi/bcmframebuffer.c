@@ -29,7 +29,7 @@ static struct {
 } __attribute__ ((aligned (16))) fb_info;
 
 
-static int _posx, _posy;
+static unsigned int _posx, _posy;
 static uint8_t _cursorcopy[2*CHARWIDTH]; // copy of the data under the cursor
 static int _fgcolor, _bgcolor, _cursorcolor;
 
@@ -41,7 +41,7 @@ static inline uint8_t *_ptr_for_char(int x, int y) {
 /* Write a cursor to the screen, save the pixels that were overwritten to 
  * _cursorcopy so these can be restored by _erasecursor() when required
  */
-static void _writecursor() {
+static void _writecursor(void) {
     uint8_t *p = _ptr_for_char(_posx, _posy);
     
     p+=fb_info.pitch*(CHARHEIGHT-4);
@@ -55,7 +55,7 @@ static void _writecursor() {
 /* Erase the cursor to the screen, restore the pixels that were saved to 
  * _cursorcopy.
  */
-static void _erasecursor() {
+static void _erasecursor(void) {
     uint8_t *p = _ptr_for_char(_posx, _posy);
     
     p+=fb_info.pitch*(CHARHEIGHT-4);
@@ -122,7 +122,7 @@ void PiPyOS_bcm_framebuffer_putstring(const char *s, int count) {
     uint8_t color;
     uint8_t *p, *p2;
     
-    int escapestate = 0, escapeparam = 0;
+    unsigned int escapestate = 0, escapeparam = 0;
     
     
     /* Some optimization: we only write the cursor when we are done writing 

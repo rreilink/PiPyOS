@@ -8,10 +8,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "bcmmailbox.h"
-#include "bcmframebuffer.h"
+#include "pi/bcmmailbox.h"
+#include "pi/bcmframebuffer.h"
 
-#include "os.h"
+#include "os/os.h"
 #include "ff.h"
 #include "bcm2835.h"
 

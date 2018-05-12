@@ -9,8 +9,6 @@
 
 int lstat(const char *path, struct stat *buf);
 
-#include "os.h"
-
 extern int fileno(FILE *f); // TODO: should come from stdio.h
 
 //TODO

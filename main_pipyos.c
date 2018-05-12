@@ -57,7 +57,7 @@ static msg_t PythonThread(void *p) {
   setenv("HOME", "/", 1); // prevent import of pwdmodule in posixpath.expanduser
 
   Py_FileSystemDefaultEncoding = "latin-1";
-  Py_SetPath(L"/boot:/boot/app:/sd/python36.zip");
+  Py_SetPath(L"/boot:/boot/app:/sd/python36z.zip");
   
   printf("GOGOGO!\n");
   if (!sdcConnect(&SDCD1)) {

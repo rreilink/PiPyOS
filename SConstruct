@@ -81,7 +81,7 @@ chibios = env_chibios.Object(
 ######################
 
 env_py=env_base.Clone(
-    CPPPATH=['.', 'adaptors', 'deps/cpython/Include'],
+    CPPPATH=['.', 'adaptors', 'deps/cpython/Include', 'deps/cpython/Modules/zlib'],
     )
 
 env_py.Append(CCFLAGS=['-std=gnu99', '-DPy_BUILD_CORE', '-Wno-unused-function', '-Wno-unused-variable', '-Wno-unused-parameter'])
@@ -108,8 +108,11 @@ python = env_py.Object(
      'deps/cpython/Modules/_math.c', 'deps/cpython/Modules/timemodule.c',
      'deps/cpython/Modules/itertoolsmodule.c', 'deps/cpython/Modules/_functoolsmodule.c',
      'deps/cpython/Modules/atexitmodule.c', 'deps/cpython/Modules/arraymodule.c',
+     'deps/cpython/Modules/zlibmodule.c',
      'config.c',
      ]
+    ,
+    skip(Glob('deps/cpython/Modules/zlib/*.c'), ['example.c', 'minigzip.c'])
     ,
     Glob('deps/cpython/Modules/_io/*.c')
     ,

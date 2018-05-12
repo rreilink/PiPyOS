@@ -34,6 +34,7 @@ extern PyObject* PyInit_time(void);
 extern PyObject* PyInit__functools(void);
 extern PyObject* PyInit_atexit(void);
 extern PyObject* PyInit_array(void);
+extern PyObject* PyInit_zlib(void);
 extern PyObject* PyInit__rpi(void);
 extern PyObject* PyInit_app(void);
 
@@ -61,6 +62,7 @@ struct _inittab _PyImport_Inittab[] = {
 {"_functools", PyInit__functools},
 {"atexit", PyInit_atexit},
 {"array", PyInit_array},
+{"zlib", PyInit_zlib},
 {"_rpi", PyInit__rpi},
 {"_app", PyInit_app},
 /* -- ADDMODULE MARKER 2 -- */

@@ -120,6 +120,7 @@ def main(target=None, source=None, env=None):
     fs.addfile('lib/posixpath.py','/posixpath.py') 
     fs.addfile('lib/sysconfig.py','/sysconfig.py') 
     fs.addfile('python/_readline.py','/_readline.py')  
+    fs.addfile('python/loader.py','/loader.py') 
     for file in glob.glob('app/target/*'):
         fs.addfile(file, '/app/' + file[11:])
 

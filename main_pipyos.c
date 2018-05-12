@@ -60,12 +60,7 @@ static msg_t PythonThread(void *p) {
   Py_SetPath(L"/boot:/boot/app:/sd/python36z.zip");
   
   printf("GOGOGO!\n");
-  if (!sdcConnect(&SDCD1)) {
-    printf("OK\r\n");  
-  } else {
-    printf("sdcConnect failed\r\n");  
-  }
-  
+
   FATFS fs;
   f_mount(&fs, "", 0);
 

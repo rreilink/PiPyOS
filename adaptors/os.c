@@ -381,6 +381,9 @@ int _close(int fd) {
     if (fd<=2) { // Do not allow to close stdio
         error = EPERM;
         return -1;
+    } else if (fd>=MAX_OPEN_FILES) {
+        errno = EBADF;
+        return -1;
     } else {    
         switch(openfiles[fd].handler) {
             case HANDLER_FAT:
@@ -403,6 +406,11 @@ ssize_t _write(int fd, const void *buf, size_t count) {
 
     TRACE_ENTRY("%d,<buffer>,%d", "write", fd, count);
 
+    if (fd>=MAX_OPEN_FILES) {
+        errno = EBADF;
+        return -1;
+    }
+    
     switch(openfiles[fd].handler) {
         case HANDLER_FRAMEBUFFER:
             PiPyOS_bcm_framebuffer_putstring((const char *)buf, count);
@@ -429,6 +437,11 @@ ssize_t _read(int fd, void *buf, size_t count) {
     
     if (fd>0) TRACE_ENTRY("%d,<buffer>,%d", "read", fd, count);
     
+    if (fd>=MAX_OPEN_FILES) {
+        errno = EBADF;
+        return -1;
+    }
+    
     switch(openfiles[fd].handler) {
         case HANDLER_FAT:
             error = f_read(&openfiles[fd].ff_fil, buf, count, &bytesread);
@@ -442,9 +455,14 @@ ssize_t _read(int fd, void *buf, size_t count) {
             ret = PiPyOS_initfs_read(&openfiles[fd].initfs, buf, count);
             break;
         case HANDLER_SERIAL:
-            if (count ==0) return 0;
-            while(chSequentialStreamRead(openfiles[fd].serialstream, buf, 1)==0);
-            ret = 1;
+            // Read at most one byte for stdin
+            if (fd == 0 && count) count = 1;
+            
+            for(unsigned int i=0;i<count;i++) {
+                while(chSequentialStreamRead(openfiles[fd].serialstream, buf, 1)==0);
+                buf++;
+            }
+            return count;
             break;
         default:
             errno = EBADF; // no read from all other file handlers including HANDLER_NONE (closed file)

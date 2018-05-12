@@ -117,7 +117,8 @@ python = env_py.Object(
     'adaptors/bcmmailbox.c',
     'adaptors/bcmframebuffer.c',
     'adaptors/_rpimodule.c',
-    'app/appmodule.c',
+    Glob('src/py/*.c'),
+    Glob('app/*.c'),
     ]
     )
 

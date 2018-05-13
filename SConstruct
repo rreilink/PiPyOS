@@ -1,6 +1,7 @@
 import sys
 sys.path.append('tools')
 import mkinitfs
+import mkzloader
 
 def skip(files, toskip):
     return [f for f in files if not f.name in toskip]
@@ -20,8 +21,8 @@ env_base = Environment(
 
     LINKFLAGS=
         '-mcpu=arm1176jz-s '
-        '-T BCM2835.ld -nostartfiles '
-        '-Wl,--no-warn-mismatch,--gc-sections -mno-thumb-interwork '
+        '-nostartfiles '
+        '-Wl,--no-warn-mismatch,--gc-sections -mno-thumb-interwork -Wl,-Map,${TARGET}.map '.split()
     ,
     LINKCOM='$CC -o $TARGET $LINKFLAGS $_LIBDIRFLAGS $_LIBFLAGS $SOURCES',
     ASCOM='$CC $ASFLAGS $_CPPINCFLAGS -o $TARGET $SOURCES',
@@ -29,7 +30,7 @@ env_base = Environment(
     
     ASCOMSTR = "Assembling $TARGET",
     #CCCOMSTR = "Compiling $TARGET",
-    LINKCOMSTR = "Linking $TARGET",
+    #LINKCOMSTR = "Linking $TARGET",
     
     
     )
@@ -51,7 +52,9 @@ env_chibios.Append(
         'os/ports/GCC/ARM', 'os/ports/GCC/ARM/BCM2835', 'os/kernel/include', 'test',
         'os/hal/include', 'os/hal/platforms/BCM2835', 'os/various',
         'boards/RASPBERRYPI_MODB'
-    ]] 
+    ]] ,
+    
+    LINKFLAGS = '-TBCM2835.ld'
     )
 
 c = chibios_path
@@ -83,6 +86,9 @@ env_py=env_base.Clone(
 
 env_py.Append(CCFLAGS=['-std=gnu99', '-DPy_BUILD_CORE', '-Wno-unused-function', '-Wno-unused-variable', '-Wno-unused-parameter'])
 
+# This allows us to use the Python environment also for building zloader
+# This simplifies things since they share some zlib source files
+env_py.Append(LINKFLAGS = ['-Tsrc/zloader/zloader.ld']) 
 
 python = env_py.Object(
     [
@@ -145,6 +151,16 @@ pipyos = env_chibios.Program('pipyos.elf', [
     ]
     )
 
+z = 'deps/cpython/Modules/zlib/'
+
+zloader = env_py.Program('zloader.elf', [
+     z+ 'inflate.c', z + 'adler32.c', z+ 'crc32.c', z + 'inffast.c', z + 'inftrees.c',
+    'src/zloader/zloader.c', 'src/zloader/zloader_asm.s'
+    ]
+    )
+
+
 
 Command('pipyos.img', 'pipyos.elf', 'arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
-
+Command('zloader.img', 'zloader.elf', 'arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
+Command('pipyosz.img', ['zloader.img', 'pipyos.img'], mkzloader.main)

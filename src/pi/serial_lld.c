@@ -64,6 +64,9 @@ void PiPyOS_InterruptReceived(void);
 //#define TRACE(msg)  PiPyOS_bcm_framebuffer_putstring(msg, -1)
 #define TRACE(msg)
 
+void bcm2835_register_interrupt(unsigned int interrupt, void (*handler) (void *), void *closure); // TODO: move to hal_lld.h
+
+
 /*===========================================================================*/
 /* Driver local definitions.                                                 */
 /*===========================================================================*/
@@ -103,8 +106,7 @@ static void output_notify(GenericQueue *qp) {
 /*===========================================================================*/
 
 
-
-void sd_lld_serve_interrupt( SerialDriver *sdp ) {
+void sd_lld_serve_interrupt( SerialDriver *sdp ) { // TODO: could also be static
 
   if (UART_MIS & (UART_INT_RX | UART_INT_RT)) { // RX or RX timeout interrupt
     chSysLockFromIsr();
@@ -220,6 +222,9 @@ void sd_lld_start(SerialDriver *sdp, const SerialConfig *config) {
   // The UART needs its TX FIFO above threshold once to work
   // This is a work-around, TODO: fix
   uart_sendstr("TEST123456\n"); 
+
+  bcm2835_register_interrupt(57, (void (*)(void *))sd_lld_serve_interrupt, &SD1);
+
 
   IRQ_ENABLE2 = BIT(57-32);
 }

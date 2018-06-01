@@ -24,13 +24,15 @@ env_base = Environment(
         '-nostartfiles '
         '-Wl,--no-warn-mismatch,--gc-sections -mno-thumb-interwork -Wl,-Map,${TARGET}.map '.split()
     ,
+    CPPPATH=['adaptors', 'src', 'src/pi']
+    ,
     LINKCOM='$CC -o $TARGET $LINKFLAGS $_LIBDIRFLAGS $_LIBFLAGS $SOURCES',
     ASCOM='$CC $ASFLAGS $_CPPINCFLAGS -o $TARGET $SOURCES',
     ASFLAGS="-c -x assembler-with-cpp $CCFLAGS",
     
     ASCOMSTR = "Assembling $TARGET",
     #CCCOMSTR = "Compiling $TARGET",
-    #LINKCOMSTR = "Linking $TARGET",
+    LINKCOMSTR = "Linking $TARGET",
     
     
     )
@@ -42,22 +44,25 @@ env_base = Environment(
 
 chibios_path = 'deps/ChibiOS-RPi/'
 
+# Add include path to the base environment
+env_base.Append(
+    CPPPATH=['deps/ff13a'] + [chibios_path + x for x in [
+        '',
+        'os/ports/GCC/ARM', 'os/ports/GCC/ARM/BCM2835', 'os/kernel/include', 'test',
+        'os/hal/include', 'os/hal/platforms/BCM2835', 'os/various',
+        'boards/RASPBERRYPI_MODB'
+    ]]
+    )
+
+# Add custom compile flags to a dedicated ChibiOS environment
+
 env_chibios = env_base.Clone()
 env_chibios.Append(
     CCFLAGS=
     '-fomit-frame-pointer -Wall -Wextra -Wstrict-prototypes  -Wno-unused-parameter'.split(),
     
-    CPPPATH=['.', 'adaptors', 'src', 'deps/ff13a'] + [chibios_path + x for x in [
-        '',
-        'os/ports/GCC/ARM', 'os/ports/GCC/ARM/BCM2835', 'os/kernel/include', 'test',
-        'os/hal/include', 'os/hal/platforms/BCM2835', 'os/various',
-        'boards/RASPBERRYPI_MODB'
-    ]] ,
-    
     LINKFLAGS = '-TBCM2835.ld'
     )
-
-c = chibios_path
 
 chibios = env_chibios.Object(
     [
@@ -67,7 +72,7 @@ chibios = env_chibios.Object(
      Glob(chibios_path + 'os/kernel/src/*.c'),
      Glob(chibios_path + 'os/hal/src/*.c'),
      Glob(chibios_path + 'test/*.c'),
-     skip(Glob(chibios_path + 'os/hal/platforms/BCM2835/*.c'),['hal_lld.c', 'serial_lld.c', 'sdc_lld.c']),
+     skip(Glob(chibios_path + 'os/hal/platforms/BCM2835/*.c'),['hal_lld.c', 'serial_lld.c', 'sdc_lld.c', 'spi_lld.c']),
      chibios_path + 'os/various/shell.c',
      chibios_path + 'os/various/chprintf.c',
      chibios_path + 'boards/RASPBERRYPI_MODB/board.c',
@@ -80,11 +85,12 @@ chibios = env_chibios.Object(
 #      Python        #
 ######################
 
-env_py=env_base.Clone(
-    CPPPATH=['.', 'adaptors', 'src', 'deps/cpython/Include', 'deps/cpython/Modules/zlib'],
-    )
+env_py=env_base.Clone()
 
-env_py.Append(CCFLAGS=['-std=gnu99', '-DPy_BUILD_CORE', '-Wno-unused-function', '-Wno-unused-variable', '-Wno-unused-parameter'])
+env_py.Append(
+    CPPPATH=['.', 'adaptors', 'src', 'deps/cpython/Include', 'deps/cpython/Modules/zlib'],
+    CCFLAGS=['-std=gnu99', '-DPy_BUILD_CORE', '-Wno-unused-function', '-Wno-unused-variable', '-Wno-unused-parameter']
+    )
 
 # This allows us to use the Python environment also for building zloader
 # This simplifies things since they share some zlib source files

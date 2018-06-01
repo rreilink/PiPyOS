@@ -28,10 +28,13 @@
 
 #include "ch.h"
 #include "hal.h"
+#include "bcmframebuffer.h"
 
 /*===========================================================================*/
 /* Driver local definitions.                                                 */
 /*===========================================================================*/
+
+void bcm2835_register_interrupt(unsigned int interrupt, void (*handler) (void *), void *closure);
 
 /*===========================================================================*/
 /* Driver exported variables.                                                */
@@ -41,22 +44,14 @@
 /* Driver local variables.                                                   */
 /*===========================================================================*/
 
+static void (*interrupt_handler[64]) (void *);
+static void *interrupt_handler_closure[64];
+
 /*===========================================================================*/
 /* Driver local functions.                                                   */
 /*===========================================================================*/
 
-/**
- * @brief Start the system timer
- *
- * @notapi
- */
-static void systimer_init( void )
-{
-  SYSTIMER_CMP1 = SYSTIMER_CLO + (1000000/CH_FREQUENCY);
-  SYSTIMER_CS = SYSTIMER_CS_MATCH1; //write to clear bit
-  
-  IRQ_ENABLE1 = 2;
-}
+
 
 
 void app_systick(void);
@@ -66,7 +61,7 @@ void app_systick(void);
  *
  * @notapi
  */
-static void systimer_serve_interrupt( void )
+static void systimer_serve_interrupt( void * dummy )
 {
   SYSTIMER_CMP1 += (1000000/CH_FREQUENCY);
 
@@ -81,6 +76,21 @@ static void systimer_serve_interrupt( void )
 
 }
 
+/**
+ * @brief Start the system timer
+ *
+ * @notapi
+ */
+static void systimer_init( void )
+{
+  SYSTIMER_CMP1 = SYSTIMER_CLO + (1000000/CH_FREQUENCY);
+  SYSTIMER_CS = SYSTIMER_CS_MATCH1; //write to clear bit
+  
+  IRQ_ENABLE1 = (1<<1);
+  bcm2835_register_interrupt(1, systimer_serve_interrupt, NULL);
+}
+
+
 /*===========================================================================*/
 /* Driver interrupt handlers.                                                */
 /*===========================================================================*/
@@ -89,59 +99,28 @@ static void systimer_serve_interrupt( void )
  * @brief Interrupt handler
  *
  */
+
 CH_IRQ_HANDLER(IrqHandler)
 {
   CH_IRQ_PROLOGUE();
   asm volatile ("stmfd    sp!, {r4-r11}" : : : "memory"); //  These are not saved by the IRQ PROLOGUE
 
-/*  
-  unsigned mode;
-  asm volatile("mrs %0, CPSR" : "=r"(mode));
-  mini_uart_sendhex(mode, 1);
-  for(;;);
-*/
-  uint32_t pend1, pend2;
-
+  uint64_t pending;
   do {
-    pend1 = IRQ_PEND1;
-    pend2 = IRQ_PEND2;  
-#if HAL_USE_SERIAL
-    if (pend2 & BIT(57-32)) {
-      sd_lld_serve_interrupt(&SD1);
-      continue;
+    pending = IRQ_PEND1 | ((uint64_t) IRQ_PEND2) << 32;
+    
+    if (!pending) break;
+    
+    for (int i = 63; i>=0; i--, pending<<=1) {
+        if (pending & (1LL<<63)) {
+            interrupt_handler[i](interrupt_handler_closure[i]);
+            break;
+        }
     }
-#endif
-/*
-#if HAL_USE_SPI
-    if (pend2 & BIT(22)) { // Bit 54
-        spi_lld_serve_interrupt(&SPI0);
-        continue;
-    }
-#endif
-*/
-    if (pend1 & BIT(1)) {
-
-      systimer_serve_interrupt();
-      continue;
-    }
-
-
-/*
-#if HAL_USE_I2C
-  i2c_lld_serve_interrupt(&I2C0);
-#endif
-
-#if HAL_USE_SPI
-  spi_lld_serve_interrupt(&SPI0);
-#endif
-
-#if HAL_USE_GPT
-  gpt_lld_serve_interrupt();
-#endif
-*/
-  } while (0);
+    
+  } while (1);
   
-  asm volatile ("ldmfd   sp!, {r4-r11}" : : : "memory"); //  These are not saved by tge IRQ PROLOGUE
+  asm volatile ("ldmfd   sp!, {r4-r11}" : : : "memory"); //  These are not saved by the IRQ PROLOGUE
 
   CH_IRQ_EPILOGUE();
 }
@@ -160,13 +139,28 @@ void delayMicroseconds(uint32_t n)
   while (SYSTIMER_CLO < compare);
 }
 
+static void unused_interrupt(int interrupt) {
+    // TODO: log / panic?
+}
+
 /**
  * @brief   Low level HAL driver initialization.
  *
  * @notapi
  */
 void hal_lld_init(void) {
+  for(int i=0;i<64;i++) {
+    bcm2835_register_interrupt(i, (void (*)(void *))unused_interrupt, (void *)i);
+  }
+  //bcm2835_register_interrupt(54, (void (*)(void *))spi_lld_serve_interrupt, &SPI0);
   systimer_init();
+}
+
+void bcm2835_register_interrupt(unsigned int interrupt, void (*handler) (void *), void *closure) {
+    if (interrupt<64) {
+        interrupt_handler[interrupt] = handler;
+        interrupt_handler_closure[interrupt] = closure;
+    }
 }
 
 /**

@@ -3,3 +3,4 @@
 /*.img
 *.pyc
 
+.DS_Store

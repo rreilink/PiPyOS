@@ -32,8 +32,8 @@ typedef struct {
 
 #define BCM2835_SPI_CS_TA       (1<<7)
 #define BCM2835_SPI_CS_DMAEN    (1<<8)
+#define BCM2835_SPI_CS_INTD     (1<<9)
 #define BCM2835_SPI_CS_ADCS     (1<<11)
-
 #define BCM2835_SPI_CS_RXD      (1<<17)
 #define BCM2835_SPI_CS_TXD      (1<<18)
 
@@ -63,15 +63,32 @@ static bcm2835_dma_conblk tx_conblk;
 /* Driver local functions.                                                   */
 /*===========================================================================*/
 
-static void spi_lld_serve_rx_interrupt(SPIDriver *spip) {
+/*
+ * DMA-based transfer ready
+ */ 
+static void spi_lld_serve_dma_interrupt(SPIDriver *spip) {
   bcm2835_dma_acknowledge_interrupt(rx_dma_channel);
   
-  /* Portable SPI ISR code defined in the high level driver, note, it is
-     a macro.*/
   _spi_isr_code(spip);
 }
 
+/*
+ * Non-DMA based transfer ready. Read data from FIFO
+ */
+static void spi_lld_serve_spi_interrupt(SPIDriver *spip) {
+  
+  uint8_t *rxbuf = spip->rxbuf;
+  uint8_t data = 0;
 
+  while(spip->rxcnt--) {
+    data = BCM2835_SPI->fifo;
+    if (rxbuf) *rxbuf++ = data;
+  }
+  
+  BCM2835_SPI->cs = (BCM2835_SPI->cs & ~(BCM2835_SPI_CS_TA | BCM2835_SPI_CS_INTD));
+ 
+  _spi_isr_code(spip);
+}
 
 /*===========================================================================*/
 /* Driver interrupt handlers.                                                */
@@ -122,9 +139,13 @@ void spi_lld_start(SPIDriver *spip) {
 
   BCM2835_SPI->clk = divider;
 
-  bcm2835_dma_register_interrupt(rx_dma_channel, (void (*)(void *))spi_lld_serve_rx_interrupt, spip);
+  bcm2835_dma_register_interrupt(rx_dma_channel, (void (*)(void *))spi_lld_serve_dma_interrupt, spip);
   
   bcm2835_dma_enable_interrupt(rx_dma_channel);
+
+  hal_register_interrupt(54, (void (*)(void *))spi_lld_serve_spi_interrupt, spip);
+  
+  IRQ_ENABLE2 = BIT(54-32);
 }
 
 /**
@@ -173,6 +194,29 @@ void spi_lld_exchange(SPIDriver *spip, size_t n,
 
   // Beyond the max supported by the peripheral. TODO: work around it
   if (n>65532) n = 65532;
+
+  if (n<=16) {
+    // Small transfer: do not use DMA. Load the data into the FIFO and use the 
+    // SPI interrupt to read the data from the FIFO when completed
+    BCM2835_SPI->cs = (BCM2835_SPI->cs & ~BCM2835_SPI_CS_DMAEN) 
+        | BCM2835_SPI_CS_CLEAR_TX | BCM2835_SPI_CS_CLEAR_RX | BCM2835_SPI_CS_TA;
+    
+    const uint8_t *txbuf_b = txbuf;
+    spip->rxbuf = rxbuf;
+    spip->rxcnt = n;
+    uint8_t data = 0;
+    
+    for(unsigned int i=0;i<n; i++) {
+        if (txbuf_b) {
+            data = *txbuf_b++;
+        }
+        BCM2835_SPI->fifo = data;
+    }
+    
+    BCM2835_SPI->cs |= BCM2835_SPI_CS_INTD;
+
+    return;
+  }
 
   bcm2835_dma_reset(rx_dma_channel);
   bcm2835_dma_reset(tx_dma_channel);

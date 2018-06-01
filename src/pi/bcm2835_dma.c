@@ -175,8 +175,6 @@ int bcm2835_dma_isready(bcm2835_dma_channel_t channel) {
     return (!(regs->cs & BCM2835_DMA_CS_ACTIVE));
 }
 
-void bcm2835_register_interrupt(unsigned int interrupt, void (*handler) (void *), void *closure); // TODO: move to hal_lld.h
-
 
 /*
  * Register DMA complete interrupt handler for the given channel
@@ -186,7 +184,7 @@ void bcm2835_register_interrupt(unsigned int interrupt, void (*handler) (void *)
 
 void bcm2835_dma_register_interrupt(bcm2835_dma_channel_t channel, void (*handler) (void *), void *closure) {
     if (channel<=12) {
-        bcm2835_register_interrupt(channel+16, handler, closure);
+        hal_register_interrupt(channel+16, handler, closure);
     }
 }
 

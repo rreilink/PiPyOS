@@ -123,7 +123,7 @@ struct SPIDriver {
   /**
    * @brief Pending transfer count
    */
-  size_t              txcnt;
+  size_t              rxcnt;
 
 #endif /* SPI_USE_MUTUAL_EXCLUSION */
 #if defined(SPI_DRIVER_EXT_FIELDS)

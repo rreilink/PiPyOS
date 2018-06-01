@@ -1,6 +1,10 @@
 *.o
+*.pyc
+/*.map
 /*.elf
 /*.img
-*.pyc
+/initfs.bin
+/.sconsign.dblite
+/libm.a
 
 .DS_Store

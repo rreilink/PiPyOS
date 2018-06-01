@@ -28,13 +28,11 @@
 
 #include "ch.h"
 #include "hal.h"
-#include "bcmframebuffer.h"
 
 /*===========================================================================*/
 /* Driver local definitions.                                                 */
 /*===========================================================================*/
 
-void bcm2835_register_interrupt(unsigned int interrupt, void (*handler) (void *), void *closure);
 
 /*===========================================================================*/
 /* Driver exported variables.                                                */
@@ -87,7 +85,7 @@ static void systimer_init( void )
   SYSTIMER_CS = SYSTIMER_CS_MATCH1; //write to clear bit
   
   IRQ_ENABLE1 = (1<<1);
-  bcm2835_register_interrupt(1, systimer_serve_interrupt, NULL);
+  hal_register_interrupt(1, systimer_serve_interrupt, NULL);
 }
 
 
@@ -150,48 +148,18 @@ static void unused_interrupt(int interrupt) {
  */
 void hal_lld_init(void) {
   for(int i=0;i<64;i++) {
-    bcm2835_register_interrupt(i, (void (*)(void *))unused_interrupt, (void *)i);
+    hal_register_interrupt(i, (void (*)(void *))unused_interrupt, (void *)i);
   }
-  //bcm2835_register_interrupt(54, (void (*)(void *))spi_lld_serve_interrupt, &SPI0);
+
   systimer_init();
 }
 
-void bcm2835_register_interrupt(unsigned int interrupt, void (*handler) (void *), void *closure) {
+void hal_register_interrupt(unsigned int interrupt, void (*handler) (void *), void *closure) {
     if (interrupt<64) {
         interrupt_handler[interrupt] = handler;
         interrupt_handler_closure[interrupt] = closure;
     }
 }
 
-/**
- * @brief Start watchdog timer
- */
-void watchdog_start ( uint32_t timeout )
-{
-    /* Setup watchdog for reset */
-    uint32_t pm_rstc = PM_RSTC;
-
-    //* watchdog timer = timer clock / 16; need password (31:16) + value (11:0) */
-    uint32_t pm_wdog = PM_PASSWORD | (timeout & PM_WDOG_TIME_SET); 
-    pm_rstc = PM_PASSWORD | (pm_rstc & PM_RSTC_WRCFG_CLR) | PM_RSTC_WRCFG_FULL_RESET;
-    PM_WDOG = pm_wdog;
-    PM_RSTC = pm_rstc;
-}
-
-/**
- * @brief Start watchdog timer
- */
-void watchdog_stop ( void )
-{
-  PM_RSTC = PM_PASSWORD | PM_RSTC_RESET;
-}
-
-/**
- * @brief Get remaining watchdog time.
- */
-uint32_t watchdog_get_remaining ( void )
-{
-  return PM_WDOG & PM_WDOG_TIME_SET;
-}
 
 /** @} */

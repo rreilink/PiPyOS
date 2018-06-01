@@ -64,8 +64,6 @@ void PiPyOS_InterruptReceived(void);
 //#define TRACE(msg)  PiPyOS_bcm_framebuffer_putstring(msg, -1)
 #define TRACE(msg)
 
-void bcm2835_register_interrupt(unsigned int interrupt, void (*handler) (void *), void *closure); // TODO: move to hal_lld.h
-
 
 /*===========================================================================*/
 /* Driver local definitions.                                                 */
@@ -96,7 +94,7 @@ static const SerialConfig default_config = {
 /*===========================================================================*/
 
 static void output_notify(GenericQueue *qp) {
-  UNUSED(qp);  
+  (void)(qp);  
   /* Enable tx interrupts.*/
   UART_IMSC |= UART_INT_TX; 
 }
@@ -169,7 +167,7 @@ void sd_lld_init(void) {
  * @notapi
  */
 void sd_lld_start(SerialDriver *sdp, const SerialConfig *config) {
-  UNUSED(sdp);
+  (void)(sdp);
 
   unsigned int base_clock_rate, divider;
 
@@ -223,7 +221,7 @@ void sd_lld_start(SerialDriver *sdp, const SerialConfig *config) {
   // This is a work-around, TODO: fix
   uart_sendstr("TEST123456\n"); 
 
-  bcm2835_register_interrupt(57, (void (*)(void *))sd_lld_serve_interrupt, &SD1);
+  hal_register_interrupt(57, (void (*)(void *))sd_lld_serve_interrupt, &SD1);
 
 
   IRQ_ENABLE2 = BIT(57-32);
@@ -239,7 +237,7 @@ void sd_lld_start(SerialDriver *sdp, const SerialConfig *config) {
  * @notapi
  */
 void sd_lld_stop(SerialDriver *sdp) {
-  UNUSED(sdp);
+  (void)(sdp);
 
   IRQ_DISABLE2 = BIT(57-32);
   bcm2835_gpio_fnsel(14, GPFN_IN);

@@ -11,7 +11,7 @@
 
 #include "bcmmailbox.h"
 #include "assert.h"
-#include "deps/font.h"
+#include "../deps/font.h"
 
 static struct {
     uint32_t phys_width;

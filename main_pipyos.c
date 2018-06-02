@@ -142,7 +142,7 @@ void initcache(void)
     */
 }
 
-void FiqHandlerInit(void);
+
 
 /*
  * Application entry point.

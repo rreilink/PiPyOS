@@ -70,7 +70,7 @@ static void systimer_serve_interrupt( void * dummy )
 
   SYSTIMER_CS = SYSTIMER_CS_MATCH1; //write to clear bit
   
-  //app_systick();
+  app_systick();
 
 }
 

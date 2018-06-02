@@ -158,7 +158,7 @@ extern "C" {
   void spi_lld_receive(SPIDriver *spip, size_t n, void *rxbuf);
   uint16_t spi_lld_polled_exchange(SPIDriver *spip, uint16_t frame);
 
-  void spi_lld_serve_interrupt(SPIDriver *spip);
+  void spi_lld_get_dma_channels(void *rx, void *tx);
 #ifdef __cplusplus
 }
 #endif

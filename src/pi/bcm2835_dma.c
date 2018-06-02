@@ -1,49 +1,6 @@
 #include "bcm2835.h"
 #include "bcm2835_dma.h"
 
-/*
- * Registers
- */
-
-typedef struct {
-    volatile uint32_t cs;
-    volatile uint32_t conblk_ad;
-    volatile uint32_t ti;
-    volatile uint32_t source_ad;
-    volatile uint32_t dest_ad;
-    volatile uint32_t txfr_len;
-    volatile uint32_t stride;
-    volatile uint32_t nextconblk;
-    volatile uint32_t debug;
-} bcm2835_dma_regs_t;
-
-
-#define BCM2835_DMA(x)      ((bcm2835_dma_regs_t *) (0x20007000 + ((x)<<8)))
-#define BCM2835_DMA_ENABLE  (* (volatile uint32_t *) (0x20007FF0))
-
-/*
- * Register bits
- */
-
-
-#define BCM2835_DMA_CS_ACTIVE           (1<<0)
-#define BCM2835_DMA_CS_INT              (1<<2)
-
-#define BCM2835_DMA_TI_PERMAP(permap)   (((permap) & 0x1f) << 16)
-#define BCM2835_DMA_TI_SRC_IGNORE       (1<<11)
-#define BCM2835_DMA_TI_SRC_DREQ         (1<<10)
-#define BCM2835_DMA_TI_SRC_WIDTH        (1<<9)
-#define BCM2835_DMA_TI_SRC_INC          (1<<8)
-#define BCM2835_DMA_TI_DEST_IGNORE      (1<<7)
-#define BCM2835_DMA_TI_DEST_DREQ        (1<<6)
-#define BCM2835_DMA_TI_DEST_WIDTH       (1<<5)
-#define BCM2835_DMA_TI_DEST_INC         (1<<4)
-
-
-
-
-
-
 
 static unsigned int dma_channels_alloced = 0; //Bitmask of dma channels in use
 
@@ -90,13 +47,14 @@ bcm2835_dma_channel_t bcm2835_dma_alloc(unsigned int lite) {
  *   if destination / source is in memory, 128-bit destination resp. source
  *   transfer width is used; 32 bits otherwise
  *
+ *   if destination is I/O, WAIT_RESP is set
  *
- *   permap:
+ *   permap: peripheral DREQ that gates writes / reads
  */
 
 void bcm2835_dma_fill_conblk(bcm2835_dma_conblk *conblk, 
     void *destination, const void *source, unsigned long length,
-    unsigned long permap, bcm2835_dma_conblk *next) {
+    unsigned long permap) {
  
     unsigned long ti = 0;
     
@@ -104,7 +62,7 @@ void bcm2835_dma_fill_conblk(bcm2835_dma_conblk *conblk,
         ti |= BCM2835_DMA_TI_DEST_IGNORE;
     } else if (((uint32_t)destination & 0xFF000000) == 0x20000000) {
         // To I/O
-        if (permap != 0) ti |= BCM2835_DMA_TI_DEST_DREQ;
+        if (permap != 0) ti |= BCM2835_DMA_TI_DEST_DREQ | BCM2835_DMA_TI_WAIT_RESP;
         destination = (void*) ((uint32_t) destination | 0x7E000000);
     } else {
         // To memory
@@ -132,11 +90,33 @@ void bcm2835_dma_fill_conblk(bcm2835_dma_conblk *conblk,
     conblk->dest_ad = (uint32_t) destination;
     conblk->txfr_len = length;
     conblk->stride = 0;
-    conblk->nextconblk = (uint32_t)next;
+    conblk->nextconblk = 0;
     conblk->reserved[0] = 0; 
     conblk->reserved[1] = 0; 
     
 }
+
+/* Fill a conblk for a 2D-mode transfer
+ *
+ * conblk, destination, source, permap: see bcm2835_dma_fill_conblk
+ * ylength: how many xlength-transfers are transferred
+ * xlength: the length of one x-transfer, in bytes
+ * destination_stride: offset to add to the destination address after each x-transfer
+ * source_stride: offset to add to the source address after each x-transfer
+ */
+void bcm2835_dma_fill_conblk_2d(bcm2835_dma_conblk *conblk, 
+    void *destination, const void *source, 
+    long destination_stride, long source_stride,
+    unsigned long xlength, unsigned long ylength,
+    unsigned long permap) {
+
+    bcm2835_dma_fill_conblk(conblk, destination, source, 0, permap);
+    
+    conblk->txfr_len = ((ylength << 16) & 0x3fff0000) | (xlength & 0xffff);
+    conblk->stride = ((destination_stride << 16) & 0xffff0000) | (source_stride & 0xffff);
+    conblk->ti |= BCM2835_DMA_TI_TDMODE;
+}
+
 
 void bcm2835_dma_reset(bcm2835_dma_channel_t channel) {
     bcm2835_dma_regs_t *regs = BCM2835_DMA(channel);
@@ -163,6 +143,8 @@ int bcm2835_dma_start(bcm2835_dma_channel_t channel, bcm2835_dma_conblk *conblk)
     
     return 0; // Succes
 }
+
+
 
 /*
  * Poll whether DMA channel is ready

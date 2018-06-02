@@ -125,6 +125,18 @@ python = env_py.Object(
     Glob('deps/cpython/Modules/_io/*.c')
     ,
     Glob('src/py/*.c'),
+    Glob('src/ext/*.c'),
+
+    Glob('deps/pylvgl/lvgl/lv_core/*.c'),
+    Glob('deps/pylvgl/lvgl/lv_draw/*.c'),
+    Glob('deps/pylvgl/lvgl/lv_hal/*.c'),
+    Glob('deps/pylvgl/lvgl/lv_misc/*.c'),
+    Glob('deps/pylvgl/lvgl/lv_objx/*.c'),
+    Glob('deps/pylvgl/lvgl/lv_themes/*.c'),
+    Glob('deps/pylvgl/lvgl/lv_misc/lv_fonts/*.c'),
+    Glob('deps/pylvgl/lvglmodule.c'),
+    
+    
     Glob('app/*.c'),
     ]
     )

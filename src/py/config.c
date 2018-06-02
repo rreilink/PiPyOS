@@ -38,6 +38,8 @@ extern PyObject* PyInit_zlib(void);
 extern PyObject* PyInit__rpi(void);
 extern PyObject* PyInit_spi(void);
 extern PyObject* PyInit_app(void);
+extern PyObject* PyInit_lvgl(void);
+extern PyObject* PyInit_pitft(void);
 
 /* -- ADDMODULE MARKER 1 -- */
 
@@ -67,6 +69,9 @@ struct _inittab _PyImport_Inittab[] = {
 {"_rpi", PyInit__rpi},
 {"spi", PyInit_spi},
 {"_app", PyInit_app},
+{"lvgl", PyInit_lvgl},
+{"pitft", PyInit_pitft},
+
 /* -- ADDMODULE MARKER 2 -- */
 
     /* This module lives in marshal.c */

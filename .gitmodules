@@ -8,3 +8,6 @@
 [submodule "deps/ChibiOS-RPi"]
 	path = deps/ChibiOS-RPi
 	url = https://github.com/rreilink/ChibiOS-RPi
+[submodule "deps/pylvgl"]
+	path = deps/pylvgl
+	url = https://github.com/rreilink/pylvgl.git

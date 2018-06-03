@@ -53,7 +53,7 @@ bcm2835_dma_channel_t bcm2835_dma_alloc(unsigned int lite) {
  */
 
 void bcm2835_dma_fill_conblk(bcm2835_dma_conblk *conblk, 
-    void *destination, const void *source, unsigned long length,
+    volatile void *destination, volatile const void *source, unsigned long length,
     unsigned long permap) {
  
     unsigned long ti = 0;
@@ -105,14 +105,16 @@ void bcm2835_dma_fill_conblk(bcm2835_dma_conblk *conblk,
  * source_stride: offset to add to the source address after each x-transfer
  */
 void bcm2835_dma_fill_conblk_2d(bcm2835_dma_conblk *conblk, 
-    void *destination, const void *source, 
+    volatile void *destination, volatile const void *source, 
     long destination_stride, long source_stride,
     unsigned long xlength, unsigned long ylength,
     unsigned long permap) {
 
     bcm2835_dma_fill_conblk(conblk, destination, source, 0, permap);
     
-    conblk->txfr_len = ((ylength << 16) & 0x3fff0000) | (xlength & 0xffff);
+    // Bug in the BCM2835 documentation: in 2D mode, it performs
+    // YLENGTH+1 xlength transfers so we need ylength-1
+    conblk->txfr_len = (((ylength-1) << 16) & 0x3fff0000) | (xlength & 0xffff);
     conblk->stride = ((destination_stride << 16) & 0xffff0000) | (source_stride & 0xffff);
     conblk->ti |= BCM2835_DMA_TI_TDMODE;
 }

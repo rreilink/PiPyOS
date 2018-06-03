@@ -65,11 +65,11 @@ typedef unsigned int bcm2835_dma_channel_t;
 bcm2835_dma_channel_t bcm2835_dma_alloc(unsigned int lite);
 
 void bcm2835_dma_fill_conblk(bcm2835_dma_conblk *conblk, 
-    void *destination, const void *source, unsigned long length,
+    volatile void *destination, volatile const void *source, unsigned long length,
     unsigned long permap);
 
 void bcm2835_dma_fill_conblk_2d(bcm2835_dma_conblk *conblk, 
-    void *destination, const void *source, 
+    volatile void *destination, volatile const void *source, 
     long destination_stride, long source_stride,
     unsigned long xlength, unsigned long ylength,
     unsigned long permap);

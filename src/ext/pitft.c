@@ -10,18 +10,22 @@ static bcm2835_dma_conblk rx_conblk[1];
 static bcm2835_dma_conblk tx_conblk[21];
 
 static uint32_t tft_pinmask;
+
+/* Data used to send to LCD and to SPI and DMA peripherals
+ * Items marked with * are overwritten by pitft_update
+ */
 static uint32_t tft_cmds[] = {
     0x000100B0, // Transfer length 1
     0x0000002A, // Command 0x2A
     0x000400B0, // Transfer length 4
-    0x3f010000, // start column, end column (bytes swapped)
+    0x00000000, // * start column, end column (bytes swapped)
     0x000100B0, // Transfer length 1
     0x0000002B, // Command 0x2B
     0x000400B0, // Transfer length 4
-    0xef000000, // start row, end row (bytes swapped)
+    0x00000000, // * start row, end row (bytes swapped)
     0x000100B0, // Transfer length 1
     0x0000002C, // Command 0x2C
-    0x7d0000B0, // Transfer length 32000
+    0x000000B0, // * Transfer length (high 16 bits) + SPI control register (low byte)
     0x00000001, // Used to start rxdma channel
 
 };
@@ -79,66 +83,71 @@ void pitft_update(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color
     bcm2835_dma_channel_t rx_dma_channel;
     bcm2835_dma_channel_t tx_dma_channel;
     bcm2835_dma_conblk *blk = tx_conblk;
-    unsigned long nbytes;
+    unsigned long npixels, nbytes;
 
-    nbytes = 2* ((x2-x1)+1)* ((y2-y1)+1);
-
+    npixels = ((x2-x1)+1)* ((y2-y1)+1);
+    nbytes = npixels * 2;
+    
     if (nbytes > 0x7ff0) {
         return; // Too large transfer, not supported
     }
     
     spi_lld_get_dma_channels(&rx_dma_channel, &tx_dma_channel);
 
-    printf("%ld %ld %ld %ld %d %d\n", x1,y1,x2,y2,rx_dma_channel, tx_dma_channel);
-    
+    // Fill LCD command data 
     tft_cmds[3] = (swapbytes(x2) << 16) | swapbytes(x1);
     tft_cmds[7] = (swapbytes(y2) << 16) | swapbytes(y1);
+    
+    // Fill SPI module command: number of data bytes (high 16 bits) + SPI control register
     tft_cmds[10] = (nbytes << 16) | 0xb0;
 
     tft_pinmask = 1<<25;
-    
-    
-    bcm2835_dma_fill_conblk(blk++, swapbuffer, ((char*)data) + 1, nbytes-1, 0); // 1a) copy framebuffer+1 to swapbuffer
-    bcm2835_dma_fill_conblk_2d(blk++, swapbuffer+1, data, 1, nbytes >> 1, 1, 1, 0); // 1b) copy even bytes of framebuffer to swapbuffer + 1
-    
+
+    // Step 1)
+    bcm2835_dma_fill_conblk(blk++, swapbuffer, ((char*) data) + 1, nbytes-1, 0);// 1a) copy framebuffer+1 to swapbuffer
+    bcm2835_dma_fill_conblk_2d(blk++, swapbuffer + 1, data, 1, 1, 1, npixels, 0); // 1b) copy even bytes of framebuffer to swapbuffer + 1
+        
+    // Step 2)-4)
     for(int i = 0; i<3;i++) {
     
-        bcm2835_dma_fill_conblk(blk++, (void*) &(GPCLR0), &tft_pinmask, 4, 0); //2a)
+        bcm2835_dma_fill_conblk(blk++, &GPCLR0, &tft_pinmask, 4, 0); //2a)
         
-        bcm2835_dma_fill_conblk(blk++, (void*) &(BCM2835_SPI->fifo), &tft_cmds[4*i], 5, 6); //2b) send transfer length + 1 byte
-        bcm2835_dma_fill_conblk(blk++, NULL, (void*) &(BCM2835_SPI->fifo), 1, 7); // 2c) read 1 byte
+        bcm2835_dma_fill_conblk(blk++, &BCM2835_SPI->fifo, &tft_cmds[4*i], 5, 6); //2b) send transfer length + 1 byte
+        bcm2835_dma_fill_conblk(blk++, NULL, &BCM2835_SPI->fifo, 1, 7); // 2c) read 1 byte
         
-        bcm2835_dma_fill_conblk(blk++, (void*) &(GPSET0), &tft_pinmask, 4, 0); // 2d)
+        bcm2835_dma_fill_conblk(blk++, &GPSET0, &tft_pinmask, 4, 0); // 2d)
                 
         if (i<2) {
-            bcm2835_dma_fill_conblk(blk++, (void*) &(BCM2835_SPI->fifo), &tft_cmds[4*i+2], 8, 6); // 2e) send transfer length + 8 byte
-            bcm2835_dma_fill_conblk(blk++, NULL, (void*) &(BCM2835_SPI->fifo), 4, 7); // 2f) read 4 bytes
+            bcm2835_dma_fill_conblk(blk++, &(BCM2835_SPI->fifo), &tft_cmds[4*i+2], 8, 6); // 2e) send transfer length + 8 byte
+            bcm2835_dma_fill_conblk(blk++, NULL, &BCM2835_SPI->fifo, 4, 7); // 2f) read 4 bytes
         }
     }
 
-    bcm2835_dma_fill_conblk(blk++, (void*) &(BCM2835_SPI->fifo), &tft_cmds[10], 4, 6); // send transfer length
+    // Step 5)
+    bcm2835_dma_fill_conblk(blk++, &BCM2835_SPI->fifo, &tft_cmds[10], 4, 6); // send transfer length
     
-    bcm2835_dma_fill_conblk(blk++, (void*) (0x20007000 + ((rx_dma_channel)<<8)), &tft_cmds[11], 4, 0); // start RX DMA channel
+    // Step 6)
+    bcm2835_dma_fill_conblk(blk++, &BCM2835_DMA(rx_dma_channel)->cs, &tft_cmds[11], 4, 0); // start RX DMA channel
     
-    
-    bcm2835_dma_fill_conblk(blk++, (void*) &(BCM2835_SPI->fifo), swapbuffer, nbytes, 6); // send nbytes bytes
-
-    bcm2835_dma_fill_conblk(&rx_conblk[0], NULL, (void*) &(BCM2835_SPI->fifo), nbytes, 7); // receive nbytes bytes
-
-    rx_conblk[0].ti |= 1; // interrupt enable
+    // Step 7)
+    bcm2835_dma_fill_conblk(blk++, &BCM2835_SPI->fifo, swapbuffer, nbytes, 6); // send nbytes bytes
 
     // chain tx blocks (all but the last)
     for (int i = 0; i< 20; i++) bcm2835_dma_chain_conblk(&tx_conblk[i], &tx_conblk[i+1]);
+
+    // build rx_conblk chain (only one link actually)
+    bcm2835_dma_fill_conblk(&rx_conblk[0], NULL, &BCM2835_SPI->fifo, nbytes, 7); // receive nbytes bytes
+    rx_conblk[0].ti |= 1; // interrupt enable
     
+    // Start DMA
     bcm2835_dma_reset(rx_dma_channel);
     bcm2835_dma_reset(tx_dma_channel);
     
     BCM2835_SPI->cs = BCM2835_SPI_CS_DMAEN | BCM2835_SPI_CS_ADCS;
 
-    // Hack: this is bcm2835_dma_start (loading of conblk pointer) without actually starting it
-    (* (volatile uint32_t *) (0x20007004 + ((rx_dma_channel)<<8))) = (uint32_t) &rx_conblk[0] | 0x40000000;
+    // This is part of bcm2835_dma_start (loading of rx conblk pointer) without actually starting it
+    BCM2835_DMA(rx_dma_channel)->conblk_ad = (uint32_t) &rx_conblk[0] | 0x40000000;
     
-
     bcm2835_dma_start(tx_dma_channel, &tx_conblk[0]);
     
 }

@@ -196,8 +196,8 @@ void spi_lld_exchange(SPIDriver *spip, size_t n,
   bcm2835_dma_reset(rx_dma_channel);
   bcm2835_dma_reset(tx_dma_channel);
 
-  bcm2835_dma_fill_conblk(&tx_conblk, (void*) &(BCM2835_SPI->fifo), txbuf, n, 6);
-  bcm2835_dma_fill_conblk(&rx_conblk, rxbuf, (void*) &(BCM2835_SPI->fifo), n, 7);
+  bcm2835_dma_fill_conblk(&tx_conblk, &BCM2835_SPI->fifo, txbuf, n, 6);
+  bcm2835_dma_fill_conblk(&rx_conblk, rxbuf, &BCM2835_SPI->fifo, n, 7);
 
   BCM2835_SPI->cs = (BCM2835_SPI->cs & ~BCM2835_SPI_CS_TA) | BCM2835_SPI_CS_DMAEN | BCM2835_SPI_CS_ADCS;
   

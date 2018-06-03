@@ -138,6 +138,36 @@ _rpi_fbwrite(PyObject *self, PyObject *args) {
 }
 
 
+static PyObject *
+_rpi_createbuffer(PyObject *self, PyObject *args) {
+    unsigned int size, alignment;
+    unsigned int data;
+    PyObject *memview;
+    if (!PyArg_ParseTuple(args, "II", &size, &alignment)) {
+        return NULL;
+    }
+    
+    data = (unsigned int )malloc(size+(alignment - 1));
+    data = data + (alignment - 1) - ((data+(alignment-1)) % alignment);
+    
+    memview = PyMemoryView_FromMemory((char *) data, size, PyBUF_WRITE);
+    if (!memview) return NULL;
+    
+    return Py_BuildValue("OI", memview, data);
+    
+}
+
+static PyObject *
+_rpi_flushcache(PyObject *self, PyObject *args){
+
+    int cr = 0;
+    __asm volatile ("mcr p15, 0, %0, c7, c14, 0" :: "r" (cr));
+    
+    Py_RETURN_NONE;
+}
+
+
+
 
 static PyMethodDef _RpiMethods[] = {
     {"peek",  _rpi_peek, METH_VARARGS, "Read a memory address."},
@@ -145,7 +175,9 @@ static PyMethodDef _RpiMethods[] = {
     {"writereadmailbox", _rpi_writereadmailbox, METH_VARARGS, "Write to mailbox and read reply."},
     {"getproperty", _rpi_get_property, METH_VARARGS, "Get VideoCore property."},
     {"fb_write", _rpi_fbwrite, METH_VARARGS, "Write bytes to the framebuffer"},
-
+    {"createbuffer", _rpi_createbuffer, METH_VARARGS, "Get an aligned buffer"},
+    {"flushcache", _rpi_flushcache, METH_NOARGS, "Flush the processor data cache"},
+    
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 

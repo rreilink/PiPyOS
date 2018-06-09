@@ -1337,7 +1337,7 @@
 #define SIZEOF_SIZE_T 4
 
 /* The size of `time_t', as computed by sizeof. */
-#undef SIZEOF_TIME_T
+#define SIZEOF_TIME_T 8
 
 /* The size of `uintptr_t', as computed by sizeof. */
 #undef SIZEOF_UINTPTR_T

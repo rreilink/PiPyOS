@@ -9,9 +9,7 @@ def skip(files, toskip):
 env_base = Environment(
     CC='arm-none-eabi-gcc',  
     CCFLAGS=
-    # '-mfloat-abi=soft -Wno-psabi '
-    # '-march=armv7-a -mtune=cortex-a7 '
-    '-mcpu=arm1176jz-s -mfloat-abi=soft -mno-thumb-interwork '
+    '-march=armv6zk -mtune=arm1176jzf-s -mfloat-abi=soft -mno-unaligned-access -mno-thumb-interwork '
     '-Wall -ffunction-sections -fdata-sections -g '
     '-D_XOPEN_SOURCE=600 '
     '-O2'.split()
@@ -20,7 +18,7 @@ env_base = Environment(
     LIBS=['m'],
 
     LINKFLAGS=
-        '-mcpu=arm1176jz-s '
+        '-march=armv6zk -mtune=arm1176jzf-s '
         '-nostartfiles '
         '-Wl,--no-warn-mismatch,--gc-sections -mno-thumb-interwork -Wl,-Map,${TARGET}.map '.split()
     ,
@@ -36,6 +34,7 @@ env_base = Environment(
     
     
     )
+env_base.PrependENVPath('PATH', '/opt/local/bin')
 
 ######################
 #      ChibiOS       #
@@ -179,6 +178,6 @@ zloader = env_py.Program('zloader.elf', [
 
 
 
-Command('pipyos.img', 'pipyos.elf', 'arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
-Command('zloader.img', 'zloader.elf', 'arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
-Command('pipyosz.img', ['zloader.img', 'pipyos.img'], mkzloader.main)
+env_base.Command('pipyos.img', 'pipyos.elf', 'arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
+env_base.Command('zloader.img', 'zloader.elf', 'arm-none-eabi-objcopy -O binary $SOURCE $TARGET')
+env_base.Command('pipyosz.img', ['zloader.img', 'pipyos.img'], mkzloader.main)

@@ -30,7 +30,7 @@ static uint32_t tft_cmds[] = {
 
 };
 
-static char swapbuffer[32000];
+static char swapbuffer[32768];
 
 
 static inline unsigned int swapbytes(unsigned int x) {
@@ -89,6 +89,7 @@ void pitft_update(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color
     nbytes = npixels * 2;
     
     if (nbytes > 0x7ff0) {
+        printf("ERROR TOO LARGE\n");
         return; // Too large transfer, not supported
     }
     
@@ -203,7 +204,7 @@ pitft_init(PyObject *self, PyObject *args) {
     chThdSleepMilliseconds(100);
     sendcommand(0x29, 0, NULL);
     chThdSleepMilliseconds(20);
-    sendcommand(0x36, 1, "\xe0");
+    sendcommand(0x36, 1, "\xe8");
     sendcommand(0x2a, 4, "\x00\x00\x01\x3f");
     sendcommand(0x2b, 4, "\x00\x00\x00\xef");    
     
@@ -231,47 +232,61 @@ pitft_command(PyObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 static lv_disp_drv_t driver = {0};
-static int downsample = 0;
 static int connected = 0;
-static int pending = 0;
+
+
+static Mutex lvgl_mutex;
+
+void lvgl_lock(Mutex * mtx) {
+//    printf("L\n");
+    chMtxLock(mtx);
+//    printf("l\n");
+}
+
+void lvgl_unlock(void * arg) {
+    (void) arg;
+//    printf("U\n");
+    chMtxUnlock();
+}
+
+static WORKING_AREA(waLvglUpdateThread, 65536);
+static msg_t LvglUpdateThread(void *p) {
+  (void)p;
+  chRegSetThreadName("lvgl update");
+  while (TRUE) {
+//    printf("X\n");
+    chMtxLock(&lvgl_mutex);
+//    printf("x\n");
+    lv_tick_inc(20);
+    lv_task_handler();
+//    printf("y\n");
+    chMtxUnlock();
+    
+    chThdSleepMilliseconds(20);
+  }
+  return 0;
+}
+
+
 
 static PyObject *
 pitft_connect(PyObject *self, PyObject *args) {
+    if (connected) {
+        PyErr_SetString(PyExc_RuntimeError, "already connected");
+        return NULL;
+    }
+
     driver.disp_flush = pitft_update;
     lv_disp_set_active(lv_disp_drv_register(&driver));
+    
+    lv_set_lock_unlock(lvgl_lock, &lvgl_mutex, lvgl_unlock, NULL);
+    
+    chThdCreateStatic(waLvglUpdateThread, sizeof(waLvglUpdateThread), NORMALPRIO, LvglUpdateThread, NULL);
+    
     connected = 1;
     Py_RETURN_NONE;
 }
 
-int poll(void * dummy) {
-    lv_tick_inc(20);
-    lv_task_handler();
-    pending = 0;
-    return 0;
-}
-
-
-
-void app_systick(void) {
-    // TODO: neat way to register systick handler
-    if (!connected) return;
-    if (downsample++ >=20) {
-        downsample = 0;
-        if (!pending) {
-            pending = 1;
-            Py_AddPendingCall(poll, NULL);
-        }
-    }
-}
-
-
-static PyObject *
-pitft_poll(PyObject *self, PyObject *args) {
-    lv_tick_inc(50);
-    lv_task_handler();
-
-    Py_RETURN_NONE;
-}
 
 
 
@@ -280,7 +295,6 @@ static PyMethodDef PitftMethods[] = {
     {"init",  pitft_init, METH_NOARGS, PITFT_INIT_DOC},
     {"command",  pitft_command, METH_VARARGS, PITFT_COMMAND_DOC},
     {"connect", pitft_connect, METH_NOARGS, NULL},
-    {"poll", pitft_poll, METH_NOARGS, NULL},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
@@ -306,6 +320,8 @@ PyInit_pitft(void) {
     
     module = PyModule_Create(&pitftmodule);
     if (!module) goto error;
+
+    chMtxInit(&lvgl_mutex);
 
     return module;
     

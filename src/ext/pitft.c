@@ -231,35 +231,74 @@ pitft_command(PyObject *self, PyObject *args) {
     
     Py_RETURN_NONE;
 }
-static lv_disp_drv_t driver = {0};
+static lv_disp_drv_t display_driver = {0};
+static lv_indev_drv_t indev_driver = {0};
+static int indev_x, indev_y, indev_state=0;
+
 static int connected = 0;
-
-
 static Mutex lvgl_mutex;
+static I2CConfig i2c_cfg;
+
+static bool indev_read(lv_indev_data_t *data) {
+    data->point.x = indev_x;
+    data->point.y = indev_y;
+    data->state = indev_state;
+
+    return false;
+}
 
 void lvgl_lock(Mutex * mtx) {
-//    printf("L\n");
     chMtxLock(mtx);
-//    printf("l\n");
 }
 
 void lvgl_unlock(void * arg) {
     (void) arg;
-//    printf("U\n");
     chMtxUnlock();
 }
 
 static WORKING_AREA(waLvglUpdateThread, 65536);
+
 static msg_t LvglUpdateThread(void *p) {
   (void)p;
+  
+  unsigned char touchdata[16];
+  unsigned char read_address = 0;
+  unsigned int touch, touch_x, touch_y;
+  msg_t result;
+  
   chRegSetThreadName("lvgl update");
   while (TRUE) {
-//    printf("X\n");
+    touch = 0;
+    // Read touch
+    if (I2C1.state == I2C_READY) {
+        result = i2cMasterTransmitTimeout(&I2C1, 0x38, &read_address, 1, touchdata, 16, CH_FREQUENCY/10);
+        if (result == RDY_OK) {
+            unsigned char ntouches = touchdata[2];
+            if (ntouches > 2) ntouches = 2; // We only read 16 bytes of data, prevent out-of-bounds
+            
+            // We only support one touch at a time; process only touch id 0
+            for (int i = 0; i<ntouches; i++) {
+                unsigned int touch_id = touchdata[5+6*i] >> 4;
+                if (touch_id == 0) {
+                    touch = 1;
+                    touch_x = (touchdata[3+6*i] & 0xf) << 8 | touchdata[4+6*i];
+                    touch_y = (touchdata[5+6*i] & 0xf) << 8 | touchdata[6+6*i];
+                }
+            }        
+        }
+    }
+  
     chMtxLock(&lvgl_mutex);
-//    printf("x\n");
+    
+    indev_state = touch ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
+    if (touch) {
+        // Touch coordinate system is rotated 90 degrees for landscape PiTFT
+        indev_x = touch_y;
+        indev_y = 239 - touch_x;
+    }
+    
     lv_tick_inc(20);
     lv_task_handler();
-//    printf("y\n");
     chMtxUnlock();
     
     chThdSleepMilliseconds(20);
@@ -276,10 +315,20 @@ pitft_connect(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    driver.disp_flush = pitft_update;
-    lv_disp_set_active(lv_disp_drv_register(&driver));
+    display_driver.disp_flush = pitft_update;
+    lv_disp_set_active(lv_disp_drv_register(&display_driver));
+
+    lv_indev_drv_init(&indev_driver);
+    indev_driver.type = LV_INDEV_TYPE_POINTER;
+    indev_driver.read = indev_read;
+    lv_indev_drv_register(&indev_driver);
     
     lv_set_lock_unlock(lvgl_lock, &lvgl_mutex, lvgl_unlock, NULL);
+    
+    if (I2C1.state != I2C_READY) {
+        i2c_cfg.ic_speed = 100000;
+        i2cStart(&I2C1, &i2c_cfg);
+    }
     
     chThdCreateStatic(waLvglUpdateThread, sizeof(waLvglUpdateThread), NORMALPRIO, LvglUpdateThread, NULL);
     

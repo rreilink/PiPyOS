@@ -2,7 +2,7 @@
 #include "hal.h"
 
 
-#define SPI_START_DOC "spi_start(channel, chipselect, frequency, cspol, cpol, cpha)"
+#define SPI_START_DOC "start(channel, chipselect, frequency, cspol, cpol, cpha)"
 
 static SPIConfig cfg; //TODO: the low level driver should copy the settings, or we should manage them
 
@@ -59,7 +59,7 @@ spi_select_unselect(PyObject *self, PyObject *args, int select) {
     Py_RETURN_NONE;
 }
 
-#define SPI_SELECT_DOC "spi_select(channel)"
+#define SPI_SELECT_DOC "select(channel)"
 
 static PyObject *
 spi_select(PyObject *self, PyObject *args) {
@@ -68,7 +68,7 @@ spi_select(PyObject *self, PyObject *args) {
 
 
 
-#define SPI_UNSELECT_DOC "spi_unselect(channel)"
+#define SPI_UNSELECT_DOC "unselect(channel)"
 
 static PyObject *
 spi_unselect(PyObject *self, PyObject *args) {
@@ -78,9 +78,9 @@ spi_unselect(PyObject *self, PyObject *args) {
 
 
 #define SPI_EXCHANGE_DOC \
-"spi_exchange(channel, txdata, rx)\n" \
+"exchange(channel, txdata, rx)\n" \
 "\n" \
-"txdata: bytes buffer or None, in which case data is transmitted\n" \
+"txdata: bytes buffer or None, in which case no data is transmitted ('\0' bytes)\n" \
 "rx:     when txdata is None: number of bytes to be received\n" \
 "        when txdata is not None: boolean whether or not to receive data\n"
 
@@ -159,15 +159,7 @@ static struct PyModuleDef spimodule = {
 
 PyMODINIT_FUNC
 PyInit_spi(void) {
+ 
+    return PyModule_Create(&spimodule); // could be NULL in case of error
 
-    PyObject *module = NULL;
-    
-    module = PyModule_Create(&spimodule);
-    if (!module) goto error;
-
-    return module;
-    
-error:
-    Py_XDECREF(module);
-    return NULL;
 }

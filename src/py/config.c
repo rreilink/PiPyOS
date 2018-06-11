@@ -37,6 +37,7 @@ extern PyObject* PyInit_array(void);
 extern PyObject* PyInit_zlib(void);
 extern PyObject* PyInit__rpi(void);
 extern PyObject* PyInit_spi(void);
+extern PyObject* PyInit_i2c(void);
 extern PyObject* PyInit_app(void);
 extern PyObject* PyInit_lvgl(void);
 extern PyObject* PyInit_pitft(void);
@@ -68,6 +69,7 @@ struct _inittab _PyImport_Inittab[] = {
 {"zlib", PyInit_zlib},
 {"_rpi", PyInit__rpi},
 {"spi", PyInit_spi},
+{"i2c", PyInit_i2c},
 {"_app", PyInit_app},
 {"lvgl", PyInit_lvgl},
 {"pitft", PyInit_pitft},

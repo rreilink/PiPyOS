@@ -8,8 +8,6 @@
 #include "hal.h"
 #include "bcmmailbox.h"
 
-void PiPyOS_InterruptReceived(void);
-
 #if HAL_USE_SERIAL || defined(__DOXYGEN__)
 
 #define UART_DR         REG(0x20201000)
@@ -77,6 +75,7 @@ void uart_sendstr (const char *s);
 /*===========================================================================*/
 
 SerialDriver SD1;
+CondVar PiPyOS_serial_interrupt_cv;
 
 /*===========================================================================*/
 /* Driver local variables.                                                   */
@@ -113,7 +112,9 @@ void sd_lld_serve_interrupt( SerialDriver *sdp ) { // TODO: could also be static
       data = UART_DR;
       if ((data & 0xf00)==0) {
         // No errors
-        if ((data & 0xff) == 3) PiPyOS_InterruptReceived(); // catch ctrl+c
+        if ((data & 0xff) == 3) {
+            chCondBroadcastI(&PiPyOS_serial_interrupt_cv); // catch ctrl+c
+        }
         
         sdIncomingDataI(sdp, data & 0xFF);
       }
@@ -153,6 +154,7 @@ void sd_lld_serve_interrupt( SerialDriver *sdp ) { // TODO: could also be static
  * @notapi
  */
 void sd_lld_init(void) {
+  chCondInit(&PiPyOS_serial_interrupt_cv);
   sdObjectInit(&SD1, NULL, output_notify);
 }
 

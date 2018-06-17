@@ -35,6 +35,9 @@ extern PyObject* PyInit__functools(void);
 extern PyObject* PyInit_atexit(void);
 extern PyObject* PyInit_array(void);
 extern PyObject* PyInit_zlib(void);
+extern PyObject* PyInit__thread(void);
+extern PyObject* PyInit__sre(void);
+extern PyObject* PyInit__collections(void);
 extern PyObject* PyInit__rpi(void);
 extern PyObject* PyInit_spi(void);
 extern PyObject* PyInit_i2c(void);
@@ -67,6 +70,9 @@ struct _inittab _PyImport_Inittab[] = {
 {"atexit", PyInit_atexit},
 {"array", PyInit_array},
 {"zlib", PyInit_zlib},
+{"_thread", PyInit__thread},
+{"_sre", PyInit__sre},
+{"_collections", PyInit__collections},
 {"_rpi", PyInit__rpi},
 {"spi", PyInit_spi},
 {"i2c", PyInit_i2c},

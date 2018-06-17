@@ -1,10 +1,19 @@
-# include "Python.h"
+/*
+ * Driver for the Adafruit PiTFT HAT with integration with pylvgl
+ *
+ */
+
+#include "Python.h"
+#include "pythread.h"
 #include <stdint.h>
 #include "deps/pylvgl/lvgl/lvgl.h"
 #include "hal.h"
 #include "bcm2835_dma.h"
 #include "bcm2835_spi.h"
 
+
+void lv_set_lock_unlock( void (*flock)(void *), void * flock_arg, 
+            void (*funlock)(void *), void * funlock_arg);
 
 static bcm2835_dma_conblk rx_conblk[1];
 static bcm2835_dma_conblk tx_conblk[21];
@@ -256,17 +265,15 @@ void lvgl_unlock(void * arg) {
     chMtxUnlock();
 }
 
-static WORKING_AREA(waLvglUpdateThread, 65536);
-
-static msg_t LvglUpdateThread(void *p) {
-  (void)p;
-  
+void LvglUpdateThread(void *interp) {
   unsigned char touchdata[16];
   unsigned char read_address = 0;
   unsigned int touch, touch_x, touch_y;
   msg_t result;
-  
   chRegSetThreadName("lvgl update");
+
+  PyThreadState *tstate = PyThreadState_New((PyInterpreterState *) interp);
+
   while (TRUE) {
     touch = 0;
     // Read touch
@@ -297,13 +304,15 @@ static msg_t LvglUpdateThread(void *p) {
         indev_y = 239 - touch_x;
     }
     
+    
     lv_tick_inc(20);
-    lv_task_handler();
+    lv_task_handler();   
+    
     chMtxUnlock();
     
     chThdSleepMilliseconds(20);
   }
-  return 0;
+
 }
 
 
@@ -323,14 +332,17 @@ pitft_connect(PyObject *self, PyObject *args) {
     indev_driver.read = indev_read;
     lv_indev_drv_register(&indev_driver);
     
-    lv_set_lock_unlock(lvgl_lock, &lvgl_mutex, lvgl_unlock, NULL);
+    lv_set_lock_unlock((void (*)(void *))lvgl_lock, &lvgl_mutex, 
+                    (void (*)(void *))lvgl_unlock, NULL);
     
     if (I2C1.state != I2C_READY) {
         i2c_cfg.ic_speed = 100000;
         i2cStart(&I2C1, &i2c_cfg);
     }
     
-    chThdCreateStatic(waLvglUpdateThread, sizeof(waLvglUpdateThread), NORMALPRIO, LvglUpdateThread, NULL);
+    //chThdCreateStatic(waLvglUpdateThread, sizeof(waLvglUpdateThread), NORMALPRIO, LvglUpdateThread, NULL);
+
+    PyThread_start_new_thread(LvglUpdateThread, (void*) PyThreadState_GET()->interp);
     
     connected = 1;
     Py_RETURN_NONE;

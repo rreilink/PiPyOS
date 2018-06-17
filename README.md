@@ -3,7 +3,7 @@
 
 The PiPyOS project aims at providing a bare-metal Python image for the Raspberry Pi, for use in embedded and/or real-time applications. It provides the agile development that is possible with Python, without the overhead of the Linux OS that is commonly employed on the Raspberry Pi. This results in, among others, faster boot-times and more control over the hardware. By using a minimal real-time operating system (RTOS), it is possible to combine a real-time component (written in C) with a high-level application component (written in Python).
 
-At the moment, PiPyOS only runs on the Raspberry Pi 1 (i.e., the BCM2835 based Raspberry Pi's, tested on a model B, possibly also on the model Zero). This limitation is due to the fact that ChibiOS has so far only been ported to this platform. However, it should also be possible to port to the other platforms.
+At the moment, PiPyOS only runs on the Raspberry Pi 1 and Raspberry Pi Zero (i.e., the BCM2835 based Raspberry Pi's, main development is done on a Pi Zero). This limitation is due to the fact that ChibiOS has so far only been ported to this platform. However, it should also be possible to port to the other platforms.
 
 PiPyOS depends on a few components that provide its main functionality:
 
@@ -15,6 +15,12 @@ PiPyOS depends on a few components that provide its main functionality:
 
 * [ChibiOS](http://www.chibios.org)  
   This is the real-time OS. It provides a task scheduler with separate tasks for the Python interpreter and for the real-time functionality. It also provides a hardware abstraction layer (HAL) for several hardware components. PiPyOS uses the [Raspberry Pi port by Steven Bate](https://github.com/steve-bate/ChibiOS-RPi).
+
+* [FatFs](http://elm-chan.org/fsw/ff/00index_e.html)
+  This is the FAT filesystem driver that is used to read files from the SD-card
+
+* [LittlevGL](https://littlevgl.com), [pylvgl](https://github.com/rreilink/pylvgl)
+  This embedded graphics library provides GUI functionality from Python
 
 * [USPi](https://github.com/rsta2/uspi)  
   USPi provides basic USB functionality required for keyboard and ethernet functionality. This is not yet integrated.
@@ -29,6 +35,9 @@ In order to make things work, PiPyOS provides the following:
   
 * Initfs read-only memory filesystem
   Although ChibiOS provides an interface to a FAT filesystem library, this is currently not implemented in PiPyOS as there is no driver for the SD-card (yet). Instead, when building PiPyOS, several required files for starting Python (and additionally, files required for the application) are combined into a binary file. PyPiOS exposes these files (read-only) to Python via the open(), read(), readdir() etc. calls from Newlib
+
+* Python modules for specific functionality
+  E.g. spi, i2c, (for the Raspberry Pi peripherals), pitft (for the Adafruit PiTFT display)
   
 ## Status and roadmap
 
@@ -39,15 +48,17 @@ The following functionality is currently implemented:
 * readline
 * Framebuffer (screen via HDMI) support
 * evaluation of real-time performance
+* SD-card interface
+* FAT filesystem support
+* GUI support using pylvgl / LittlevGL graphics library
+* Threading support
 
 The following functionality is foreseen (in order of development)
 
+* Loadable binary modules / shared libraries
 * USB keyboard support
-* SD-card interface
-* FAT filesystem support
 * Ethernet support via USB-to-Ethernet (either internal to Raspberry Pi or external for RPi Zero)
 * TCP/IP support
-* Loadable binary modules / shared libraries
 
   
   

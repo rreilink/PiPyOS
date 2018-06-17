@@ -101,7 +101,7 @@ int select(int nfds, fd_set *readfds, fd_set *writefds,
     }
     
     milliseconds = (timeout->tv_usec / 1000) + (timeout->tv_sec * 1000);
-    chThdSleepMilliseconds(milliseconds);
+    if (milliseconds) chThdSleepMilliseconds(milliseconds);
     return 0;
 }
 

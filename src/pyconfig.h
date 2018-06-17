@@ -1426,7 +1426,7 @@
 #undef WITH_PYMALLOC
 
 /* Define if you want to compile in rudimentary thread support */
-#undef WITH_THREAD
+#define WITH_THREAD 1
 
 /* Define if you want pymalloc to be disabled when running under valgrind */
 #undef WITH_VALGRIND

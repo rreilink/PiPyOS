@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <stdio.h>
 
+
 int lstat(const char *path, struct stat *buf);
 
 extern int fileno(FILE *f); // TODO: should come from stdio.h
@@ -32,6 +33,6 @@ extern void sig_err(int);
 #define CLOCK_MONOTONIC 0
 
 
-#define PYTHREAD_NAME "dummy"
+#define PYTHREAD_NAME "chibios"
 
 #endif

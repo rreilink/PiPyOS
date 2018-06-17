@@ -32,9 +32,8 @@ static msg_t Thread1(void *p) {
   return 0;
 }
 
-//static wchar_t *argv[] = { L"python", L"-S", L"-B", L"-i", L"-c", L"import _rpi as r, app as a, zipimport; zipimport.zipimporter('/sd/python36.zip')" };
 
-static wchar_t *argv[] = { L"python", L"-S", L"-B", L"-i", L"/boot/app/gcode.py" };
+static wchar_t *argv[] = { L"python", L"-S", L"-B", L"-i", L"/sd/autoexec.py" };
 extern const char *Py_FileSystemDefaultEncoding;
 
 
@@ -44,7 +43,6 @@ int Py_Main(int argc, wchar_t **argv);
 void PiPyOS_initreadline(void);
 void Py_SetPath(const wchar_t *);
 
-void pitft_test(void);
 
 static WORKING_AREA(waPythonThread, 1048576);
 
@@ -200,7 +198,7 @@ int main(void) {
   /*
    * Creates the blinker thread.
    */
-  chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, Thread1, NULL);
+  chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO+10, Thread1, NULL);
   
   /*
    * Creates the python thread.

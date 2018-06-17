@@ -3,6 +3,16 @@ sys.path.append('tools')
 import mkinitfs
 import mkzloader
 
+import os
+
+# PiPyOS provides a replacement condvar.h in src/, which handles ChibiOS 
+# mutexes and condition variables, but we need to remove the original from the
+# cpython source tree to ensure our condvar.h is used
+try:
+    os.remove('deps/cpython/Python/condvar.h')
+except OSError:
+    pass
+
 def skip(files, toskip):
     return [f for f in files if not f.name in toskip]
 
@@ -99,7 +109,7 @@ python = env_py.Object(
     [
     skip(Glob('deps/cpython/Python/*.c'), 
         ['dynload_aix.c', 'dynload_dl.c', 'dynload_hpux.c', 'dynload_next.c',
-         'dynload_shlib.c', 'dynload_win.c', 'thread.c'])
+         'dynload_shlib.c', 'dynload_win.c'])
     ,
     skip(Glob('deps/cpython/Parser/*.c'), 
         ['parsetok_pgen.c', 'pgen.c', 'pgenmain.c', 'tokenizer_pgen.c'])
@@ -108,7 +118,7 @@ python = env_py.Object(
     ,
     ['deps/cpython/Modules/gcmodule.c', 'deps/cpython/Modules/hashtable.c', 
      'deps/cpython/Modules/main.c', 'deps/cpython/Modules/getpath.c', 
-     'deps/cpython/Modules/_tracemalloc.c', 'deps/cpython/Modules/faulthandler.c',
+     'deps/cpython/Modules/faulthandler.c',
      'deps/cpython/Modules/getbuildinfo.c', 'deps/cpython/Modules/_weakref.c',
      'deps/cpython/Modules/posixmodule.c', 'deps/cpython/Modules/zipimport.c',
      'deps/cpython/Modules/_codecsmodule.c', 'deps/cpython/Modules/errnomodule.c',
@@ -116,7 +126,8 @@ python = env_py.Object(
      'deps/cpython/Modules/_math.c', 'deps/cpython/Modules/timemodule.c',
      'deps/cpython/Modules/itertoolsmodule.c', 'deps/cpython/Modules/_functoolsmodule.c',
      'deps/cpython/Modules/atexitmodule.c', 'deps/cpython/Modules/arraymodule.c',
-     'deps/cpython/Modules/zlibmodule.c',
+     'deps/cpython/Modules/zlibmodule.c', 'deps/cpython/Modules/_threadmodule.c', 
+     'deps/cpython/Modules/_sre.c', 'deps/cpython/Modules/_collectionsmodule.c',
      ]
     ,
     skip(Glob('deps/cpython/Modules/zlib/*.c'), ['example.c', 'minigzip.c'])

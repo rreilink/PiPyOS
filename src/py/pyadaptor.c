@@ -1,6 +1,7 @@
 #include "pyconfig.h"
 #include "Python.h"
 #include "adaptor.h"
+#include "ch.h"
 #include <string.h>
 
 /*
@@ -18,6 +19,10 @@ char *PiPyOS_readline(FILE *sys_stdin, FILE *sys_stdout, const char *prompt) {
     PyObject *module = NULL, *function = NULL, *line = NULL, *linebytes = NULL, *err;
     char *line_cstr = NULL, *ret = NULL;
     Py_ssize_t len;
+
+    PyGILState_STATE gstate;
+
+    gstate = PyGILState_Ensure();
 
     if (!readlinecallback) {
     
@@ -41,10 +46,8 @@ char *PiPyOS_readline(FILE *sys_stdin, FILE *sys_stdout, const char *prompt) {
         // current readline handler as-is
         err = PyErr_Occurred();
         if (err && PyErr_GivenExceptionMatches(err, PyExc_KeyboardInterrupt)) {
-            Py_XDECREF(function);
-            Py_XDECREF(module);
-    
-            return NULL;           
+            ret = NULL;
+            goto out;           
         }
     
         goto error;
@@ -64,24 +67,22 @@ char *PiPyOS_readline(FILE *sys_stdin, FILE *sys_stdout, const char *prompt) {
     }
     memcpy(ret, line_cstr, len+1);
 
-    Py_XDECREF(linebytes);
-    Py_XDECREF(line);
-    Py_XDECREF(function);
-    Py_XDECREF(module);
-
-
-    return ret;
+    goto out;
 
 error:
-    Py_XDECREF(linebytes);
-    Py_XDECREF(line);
-    Py_XDECREF(function);
-    Py_XDECREF(module);
+    ret = NULL;
     printf("readline error\n");
     // Fall back to default ReadLine function for subsequent calls
     PyOS_ReadlineFunctionPointer = PyOS_StdioReadline;
 
-    return NULL;
+out:
+    Py_XDECREF(linebytes);
+    Py_XDECREF(line);
+    Py_XDECREF(function);
+    Py_XDECREF(module);
+    
+    PyGILState_Release(gstate);
+    return ret;
 
 }
 
@@ -89,31 +90,68 @@ void PiPyOS_initreadline(void) {
     PyOS_ReadlineFunctionPointer = PiPyOS_readline;
 }
 
-static int interrupt_state = 0;
 
+extern CondVar PiPyOS_serial_interrupt_cv;
+static volatile int interrupt_state = 0;
+
+static WORKING_AREA(waHandleInterruptThread, 4096);
 
 static int
 checksignals_witharg(void * arg)
 {
     return PyErr_CheckSignals();
 }
-void PiPyOS_InterruptReceived(void) {
-    interrupt_state = 1;
-    Py_AddPendingCall(checksignals_witharg, NULL);
+
+static msg_t HandleInterruptThread(void *p) {
+    Mutex mtx;
+    
+    chRegSetThreadName("interrupt_catcher");
+    
+    chMtxInit(&mtx);
+    
+    for(;;) {
+        chMtxLock(&mtx);
+        chCondWait (&PiPyOS_serial_interrupt_cv);
+        chMtxUnlock();
+
+        interrupt_state = 1;
+        Py_AddPendingCall(checksignals_witharg, NULL);
+    }
+    return RDY_OK;
 }
 
 int PyOS_InterruptOccurred(void) { 
     int ret = interrupt_state;
-    interrupt_state = 0;
+    if (ret) interrupt_state = 0;
     return ret;
 }
 
-void PyOS_InitInterrupts(void) { }
+void PyOS_InitInterrupts(void) {
+    /*
+     * Create a thread to wait for the PiPyOS_serial_interrupt_cv condition variable
+     *
+     * It has a priority just above the priority of the Python thread(s) to ensure
+     * it is activated when an interrupt occurs
+     */
+    chThdCreateStatic(waHandleInterruptThread, sizeof(waHandleInterruptThread), NORMALPRIO+1, HandleInterruptThread, NULL);
+}
 
 void PyOS_FiniInterrupts(void) { }
 
+void PyErr_SetInterrupt(void) {
+    interrupt_state = 1;
+}
+
 void PyOS_AfterFork() {} // Fork not supported
 
-
-
 void _fini(void) {}
+
+
+/* _tracemalloc.c cannot be built since it requires native thread-local storage,
+ * which is not implemented. We don't need _tracemalloc anyway, but we need to
+ * implement some stubs
+ */
+void _PyTraceMalloc_Init(void) { }
+void _PyTraceMalloc_Fini(void) { }
+void _PyMem_DumpTraceback(int fd, const void *ptr) { }
+

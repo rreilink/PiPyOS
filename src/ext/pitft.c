@@ -340,8 +340,6 @@ pitft_connect(PyObject *self, PyObject *args) {
         i2cStart(&I2C1, &i2c_cfg);
     }
     
-    //chThdCreateStatic(waLvglUpdateThread, sizeof(waLvglUpdateThread), NORMALPRIO, LvglUpdateThread, NULL);
-
     PyThread_start_new_thread(LvglUpdateThread, (void*) PyThreadState_GET()->interp);
     
     connected = 1;

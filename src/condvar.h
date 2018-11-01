@@ -47,6 +47,10 @@
 /* The following functions return 0 on success, nonzero on error 
  *
  * Since the ChibiOS functions return void, use the comma operator to return 0
+ *
+ * The ChibiOS chMtxUnlock() function has not parameter, but relies on
+ * unlocking in lock-reverse order. This is actually the case in ceval_gil.h,
+ * the only file from where this file is included.
  */
 #define PyMUTEX_T Mutex
 #define PyMUTEX_INIT(mut)       (chMtxInit(mut), 0)

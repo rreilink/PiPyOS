@@ -147,7 +147,6 @@ python = env_py.Object(
     Glob('deps/pylvgl/lvglmodule.c'),
     
     
-    Glob('app/*.c'),
     ]
     )
 
@@ -155,7 +154,7 @@ python = env_py.Object(
 #     User app       #
 ######################
 
-app = env_chibios.Object(skip(Glob('app/*.c'), ['appmodule.c']), Glob('app/*.S'))
+app = env_py.Object([Glob('app/*.c'), Glob('app/*.S')])
 
 
 

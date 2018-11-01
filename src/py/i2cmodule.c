@@ -13,6 +13,8 @@ static PyObject *
 i2c_start(PyObject *self, PyObject *args) {
     char *error = NULL;
     int channel, bitrate;
+    I2CDriver *ch;
+    
     if (!PyArg_ParseTuple(args, "ii", &channel, &bitrate)) {
         return NULL;
     }
@@ -27,7 +29,11 @@ i2c_start(PyObject *self, PyObject *args) {
     }
     
     cfg[channel].ic_speed = bitrate;
-    i2cStart(channels[channel], &cfg[channel]);
+
+    ch = channels[channel];
+    i2cAcquireBus(ch);
+    i2cStart(ch, &cfg[channel]);
+    i2cReleaseBus(ch);
 
     Py_RETURN_NONE;
 }
@@ -53,6 +59,7 @@ i2c_transfer(PyObject *self, PyObject *args) {
     PyObject *rxbytes = NULL;
     systime_t timeout_val;
     msg_t result;
+    I2CDriver *ch;
     
     if (!PyArg_ParseTuple(args, "iiz#if", &channel, &address, &txdata, &txdatasize, &rxcnt, &timeout)) {
         return NULL;
@@ -72,11 +79,16 @@ i2c_transfer(PyObject *self, PyObject *args) {
     rxbytes = PyBytes_FromStringAndSize(NULL, rxcnt);
     if (!rxbytes) return NULL;
 
-    if (rxcnt > 0) {
-        result = i2cMasterTransmitTimeout(channels[channel], address, txdata, txdatasize, (unsigned char*)PyBytes_AS_STRING(rxbytes), rxcnt, timeout_val);
+    ch = channels[channel];
+    i2cAcquireBus(ch);
+    
+    if (txdatasize > 0) {
+        result = i2cMasterTransmitTimeout(ch, address, txdata, txdatasize, (unsigned char*)PyBytes_AS_STRING(rxbytes), rxcnt, timeout_val);
     } else {
-        result = i2cMasterReceiveTimeout(channels[channel], address, (unsigned char*)PyBytes_AS_STRING(rxbytes), rxcnt, timeout_val);
+        result = i2cMasterReceiveTimeout(ch, address, (unsigned char*)PyBytes_AS_STRING(rxbytes), rxcnt, timeout_val);
     }
+    
+    i2cReleaseBus(ch);
     
     switch(result) {
     case RDY_OK:

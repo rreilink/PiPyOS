@@ -39,6 +39,7 @@ extern PyObject* PyInit__thread(void);
 extern PyObject* PyInit__sre(void);
 extern PyObject* PyInit__collections(void);
 extern PyObject* PyInit__rpi(void);
+extern PyObject* PyInit_chibios(void);
 extern PyObject* PyInit_spi(void);
 extern PyObject* PyInit_i2c(void);
 extern PyObject* PyInit_app(void);
@@ -74,6 +75,7 @@ struct _inittab _PyImport_Inittab[] = {
 {"_sre", PyInit__sre},
 {"_collections", PyInit__collections},
 {"_rpi", PyInit__rpi},
+{"chibios", PyInit_chibios},
 {"spi", PyInit_spi},
 {"i2c", PyInit_i2c},
 {"_app", PyInit_app},

@@ -42,51 +42,43 @@
 /* Driver local variables.                                                   */
 /*===========================================================================*/
 
-static void (*interrupt_handler[64]) (void *);
-static void *interrupt_handler_closure[64];
+#define NUM_INTERRUPTS 72 // 64 GPU interrupts + 8 BASIC IRQs
+static void (*interrupt_handler[NUM_INTERRUPTS]) (void *);
+static void *interrupt_handler_closure[NUM_INTERRUPTS];
+
+
 
 /*===========================================================================*/
 /* Driver local functions.                                                   */
 /*===========================================================================*/
 
 
-
-
-void app_systick(void);
-
-/**
- * @brief Process system timer interrupts, if present.
- *
- * @notapi
- */
+// Use ARM timer
 static void systimer_serve_interrupt( void * dummy )
 {
-  SYSTIMER_CMP1 += (1000000/CH_FREQUENCY);
-
   // Update the system time
   chSysLockFromIsr();
   chSysTimerHandlerI();
   chSysUnlockFromIsr();
-
-  SYSTIMER_CS = SYSTIMER_CS_MATCH1; //write to clear bit
-  
-  //app_systick();
+  ARM_TIMER_CLI = 0;
 
 }
 
-/**
- * @brief Start the system timer
- *
- * @notapi
- */
 static void systimer_init( void )
 {
-  SYSTIMER_CMP1 = SYSTIMER_CLO + (1000000/CH_FREQUENCY);
-  SYSTIMER_CS = SYSTIMER_CS_MATCH1; //write to clear bit
-  
-  IRQ_ENABLE1 = (1<<1);
-  hal_register_interrupt(1, systimer_serve_interrupt, NULL);
+    // Configure 1MHz clock with 1kHz reload cycle
+    ARM_TIMER_CTL = 0x003E0000;
+    ARM_TIMER_LOD = 1000-1;
+    ARM_TIMER_RLD = 1000-1;
+    ARM_TIMER_DIV = 0x000000F9; //divide by 250
+    ARM_TIMER_CLI = 0;
+    ARM_TIMER_CTL = 0x003E00A2;
+    
+
+    IRQ_ENABLE_BASIC = (1<<0);
+    hal_register_interrupt(64, systimer_serve_interrupt, NULL);
 }
+
 
 
 /*===========================================================================*/
@@ -104,17 +96,34 @@ CH_IRQ_HANDLER(IrqHandler)
   asm volatile ("stmfd    sp!, {r4-r11}" : : : "memory"); //  These are not saved by the IRQ PROLOGUE
 
   uint64_t pending;
+  uint32_t basic;
   do {
-    pending = IRQ_PEND1 | ((uint64_t) IRQ_PEND2) << 32;
+    pending = IRQ_PEND1 | ((uint64_t) IRQ_PEND2) << 32; // check GPU interrupts
     
-    if (!pending) break;
+    if (pending) {
     
-    for (int i = 63; i>=0; i--, pending<<=1) {
-        if (pending & (1LL<<63)) {
-            interrupt_handler[i](interrupt_handler_closure[i]);
-            break;
+        for (int i = 63; i>=0; i--, pending<<=1) {
+            if (pending & (1LL<<63)) {
+                interrupt_handler[i](interrupt_handler_closure[i]);
+                break;
+            }
         }
+        continue; // check for more interrupts in IRQ_PEND1 or IRQ_PEND2
     }
+    
+    basic = IRQ_BASIC & 0xff;
+    if (basic) {
+        for (int i = 7; i>=0; i--, basic<<=1) {
+            if (basic & (1<<7)) {
+                interrupt_handler[i+64](interrupt_handler_closure[i+64]);
+                break;
+            }
+        }
+        continue; // check for more interrupts in IRQ_PEND1 or IRQ_PEND2
+    }
+    
+    break; // No GPU and no BASIC interrupts; we are done
+    
     
   } while (1);
   
@@ -139,6 +148,8 @@ void delayMicroseconds(uint32_t n)
 
 static void unused_interrupt(int interrupt) {
     // TODO: log / panic?
+    PiPyOS_bcm_framebuffer_putstring("FATAL: an unused interrupt was triggered", -1);    
+    for(;;);
 }
 
 /**
@@ -147,7 +158,7 @@ static void unused_interrupt(int interrupt) {
  * @notapi
  */
 void hal_lld_init(void) {
-  for(int i=0;i<64;i++) {
+  for(int i=0;i<NUM_INTERRUPTS;i++) {
     hal_register_interrupt(i, (void (*)(void *))unused_interrupt, (void *)i);
   }
 
@@ -155,7 +166,7 @@ void hal_lld_init(void) {
 }
 
 void hal_register_interrupt(unsigned int interrupt, void (*handler) (void *), void *closure) {
-    if (interrupt<64) {
+    if (interrupt<NUM_INTERRUPTS) {
         interrupt_handler[interrupt] = handler;
         interrupt_handler_closure[interrupt] = closure;
     }

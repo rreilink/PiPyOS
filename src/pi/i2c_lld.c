@@ -258,15 +258,12 @@ msg_t i2c_lld_master_transmit_timeout(I2CDriver *i2cp, i2caddr_t addr,
   /* Enable Interrupts and start transfer.*/
   device->control |= (BSC_INTT | BSC_INTD | START_WRITE);
 
-  /* Is this really needed? there is an outer lock already */
-  chSysLock();
 
   i2cp->thread = chThdSelf();
   chSchGoSleepS(THD_STATE_SUSPENDED);
   if ((timeout != TIME_INFINITE) && chVTIsArmedI(&vt))
     chVTResetI(&vt);
 
-  chSysUnlock();
 
   msg_t status = chThdSelf()->p_u.rdymsg;
 
@@ -322,13 +319,10 @@ msg_t i2c_lld_master_receive_timeout(I2CDriver *i2cp, i2caddr_t addr,
   /* Enable Interrupts and start transfer.*/
   device->control = (BSC_INTR | BSC_INTD | START_READ);
 
-  // needed? there is an outer lock already
-  chSysLock();
   i2cp->thread = chThdSelf();
   chSchGoSleepS(THD_STATE_SUSPENDED);
   if ((timeout != TIME_INFINITE) && chVTIsArmedI(&vt))
     chVTResetI(&vt);
-  chSysUnlock();
 
   return chThdSelf()->p_u.rdymsg;
 }

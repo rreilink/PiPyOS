@@ -15,11 +15,9 @@
 #include "ff.h"
 #include "bcm2835.h"
 
-char cmdline[1025];
 
 
-
-static WORKING_AREA(waThread1, 128);
+static WORKING_AREA(waThread1, 1024);
 static msg_t Thread1(void *p) {
   (void)p;
   chRegSetThreadName("blinker");
@@ -33,44 +31,10 @@ static msg_t Thread1(void *p) {
 }
 
 
-static wchar_t *argv[] = { L"python", L"-S", L"-B", L"-i", L"/sd/autoexec.py" };
-extern const char *Py_FileSystemDefaultEncoding;
-
-
-
 
 int Py_Main(int argc, wchar_t **argv);
 void PiPyOS_initreadline(void);
 void Py_SetPath(const wchar_t *);
-
-
-static WORKING_AREA(waPythonThread, 1048576);
-
-static msg_t PythonThread(void *p) {
-  (void)p;
-  chRegSetThreadName("python");
-  
-  setenv("PYTHONHASHSEED", "0", 1); // No random numbers available
-  setenv("PYTHONHOME", "/", 1);
-  setenv("HOME", "/", 1); // prevent import of pwdmodule in posixpath.expanduser
-
-  Py_FileSystemDefaultEncoding = "latin-1";
-  Py_SetPath(L"/boot:/boot/app:/sd/python36z.zip");
-  
-  printf("GOGOGO!\n");
-
-  FATFS fs;
-  f_mount(&fs, "", 0);
-
-  
-  PiPyOS_initreadline();
-  
-  Py_Main(3, argv);
-  
-
-  
-  return 0;
-}
 
 
 static inline void dmb(void) {
@@ -141,23 +105,55 @@ void initcache(void)
 }
 
 
+void jtag_init(void) {
+    for (int pin = 22; pin<=27;pin++) {
+        bcm2835_gpio_fnsel(pin, GPFN_ALT4);
+    }
+
+}
+
+void PiPyOS_panic(void) {
+    PiPyOS_bcm_framebuffer_putstring("\nPANIC:", -1);
+    PiPyOS_bcm_framebuffer_putstring(dbg_panic_msg, -1);
+}
 
 /*
  * Application entry point.
  */
+extern const char *Py_FileSystemDefaultEncoding;
+  
 int main(void) {
   const SerialConfig serialConfig ={1000000};
   const SDCConfig sdccfg = { 0 }; 
+  char cmdline[1025];
   
+ 
   AUX_MU_CNTL_REG = 0; // disable uart RX during setup of HAL. This prevents a random char to appear in the input buffer
-  
-  halInit();
-  chSysInit();
-
-  app_init();
 
   PiPyOS_bcm_framebuffer_init(0, 0);
   PiPyOS_bcm_framebuffer_putstring("init\n", -1);
+  
+  halInit();
+
+  jtag_init();
+
+/* wait for debugger
+  int i = 1;
+  while(i) {
+  
+  }*/
+
+  /*
+   * Set mode of onboard LED
+   */
+  palSetPadMode(GPIO47_PORT, GPIO47_PAD, PAL_MODE_OUTPUT);
+
+  chSysInit();
+
+
+  app_init();
+
+
   
   /*
    * Serial port initialization.
@@ -167,6 +163,7 @@ int main(void) {
   
   chprintf((BaseSequentialStream *)&SD1, "Main (SD1 started)\r\n");
   os_init_stdio();
+   
   
   initcache();
 
@@ -179,20 +176,8 @@ int main(void) {
 
   chprintf((BaseSequentialStream *)&SD1, "cmdline='%s'\r\n", cmdline);
 
+
   sdcStart(&SDCD1, &sdccfg);
-
-//asm volatile ("mrs %0, cpsr" : "=rm" (cpsr));
-
-  /*
-   * Shell initialization.
-   */
- /* shellInit();
-  shellCreate(&shell_config, SHELL_WA_SIZE, NORMALPRIO + 1);
-*/
-  /*
-   * Set mode of onboard LED
-   */
-  palSetPadMode(GPIO47_PORT, GPIO47_PAD, PAL_MODE_OUTPUT);
 
   
   /*
@@ -200,15 +185,28 @@ int main(void) {
    */
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO+10, Thread1, NULL);
   
-  /*
-   * Creates the python thread.
-   */
-  chThdCreateStatic(waPythonThread, sizeof(waPythonThread), NORMALPRIO, PythonThread, NULL);
+  /* Start Python */
+  wchar_t *argv[] = { L"python", L"-S", L"-B", L"-i", L"/sd/autoexec.py" };
+  
+  setenv("PYTHONHASHSEED", "0", 1); // No random numbers available
+  setenv("HOME", "/", 1); // prevent import of pwdmodule in posixpath.expanduser
 
-  /*
-   * Events servicing loop.
-   */
-  chThdWait(chThdSelf());
+  Py_FileSystemDefaultEncoding = "latin-1";
+  Py_SetPath(L"/boot:/boot/app:/sd/python36z.zip");
+  
+  printf("GOGOGO!\n");
+
+  FATFS fs;
+  f_mount(&fs, "", 0);
+
+  
+  PiPyOS_initreadline();
+  
+  Py_Main(3, argv);
+  
+
+  for(;;);
+
 
   return 0;
 }

@@ -69,14 +69,19 @@
 static inline int
 PyCOND_TIMEDWAIT(PyCOND_T *cond, PyMUTEX_T *mut, long long us)
 {
+
     msg_t r = chCondWaitTimeout(cond, (us * CH_FREQUENCY)/1000000LL);
 
-    if (r == RDY_TIMEOUT)
+    if (r == RDY_TIMEOUT) {
+        // ChibiOS does not re-aquire the mutex on a timeout, but Python expects it to
+        // So we re-aquire it here
+        chMtxLock(mut);
         return 1;
-    else if (r==RDY_OK)
+    } else if (r==RDY_OK) {
         return 0;
-    else
+    } else {
         return -1;
+    }
 }
 
 #endif /* _CONDVAR_H_ */

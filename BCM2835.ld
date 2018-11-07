@@ -21,11 +21,18 @@
 /*
  * BCM2835 memory setup.
  */
-__und_stack_size__	= 0x0004;
-__abt_stack_size__	= 0x0004;
+ 
+ 
+/*
+ * ATTENTION: all stack sizes must be multiple of 8 bytes, since stack pointer
+ * must be 8-byte aligned
+ */
+ 
+__und_stack_size__	= 0x0008;
+__abt_stack_size__	= 0x0008;
 __fiq_stack_size__	= 0x0200;
 __irq_stack_size__	= 0x0200;
-__svc_stack_size__	= 0x0004;
+__svc_stack_size__	= 0x0008;
 __sys_stack_size__	= 0x0400;
 __stacks_total_size__	= __und_stack_size__ + __abt_stack_size__ + __fiq_stack_size__ + __irq_stack_size__ + __svc_stack_size__ + __sys_stack_size__;
 

@@ -69,6 +69,7 @@ i2c_transfer(PyObject *self, PyObject *args) {
     if (address<0 || address >127) error = "address should be 0<=channel<=127";
     if (rxcnt <0) error = "rxcnt should be >= 0";
     if (timeout<=0 || isnan(timeout) || isinf(timeout)) error = "timeout should be >0";
+    if ((rxcnt==0) && (txdatasize==0)) error = "txdata is empty and rxcnt=0; no data to transfer";
     if (error) {
         PyErr_SetString(PyExc_ValueError, error);
         return NULL;    

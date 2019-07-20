@@ -50,6 +50,9 @@ static void pitft_transfer_done(SPIDriver *spip) {
     lv_flush_ready();
 }
 
+static int initialized = 0;
+static SPIConfig cfg;
+
 /*
  * The pitft_update function is completely DMA driven. This function builds
  * two DMA-chains, rx_conblk and tx_conblk. Most work is done in the
@@ -158,12 +161,13 @@ void pitft_update(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color
     // This is part of bcm2835_dma_start (loading of rx conblk pointer) without actually starting it
     BCM2835_DMA(rx_dma_channel)->conblk_ad = (uint32_t) &rx_conblk[0] | 0x40000000;
     
+    
+    cfg.end_cb = pitft_transfer_done;
     bcm2835_dma_start(tx_dma_channel, &tx_conblk[0]);
     
 }
 
-static int initialized = 0;
-static SPIConfig cfg;
+
 
 void sendcommand(unsigned char command, int data_size, const char *data) {
     GPCLR0 = 1<<25;
@@ -188,7 +192,6 @@ pitft_init(PyObject *self, PyObject *args) {
     cfg.clock_polarity = 0;
     cfg.clock_phase = 0;
     cfg.clock_frequency = 20000000;
-    cfg.end_cb = pitft_transfer_done;
     spiStart(&SPI0, &cfg);
     
     sendcommand(0x01, 0, NULL);

@@ -60,6 +60,9 @@ static void systimer_serve_interrupt( void * dummy )
   chSysLockFromIsr();
   chSysTimerHandlerI();
   chSysUnlockFromIsr();
+  
+  app_systick();
+  
   ARM_TIMER_CLI = 0;
 
 }

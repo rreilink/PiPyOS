@@ -107,8 +107,9 @@ void initcache(void)
 
 void jtag_init(void) {
     for (int pin = 22; pin<=27;pin++) {
-        bcm2835_gpio_fnsel(pin, GPFN_ALT4);
+        if (pin != 25) bcm2835_gpio_fnsel(pin, GPFN_ALT4);
     }
+    bcm2835_gpio_fnsel(13, GPFN_ALT5);
 
 }
 
